@@ -18,8 +18,8 @@ With **Actors**, developers create "actors" – isolated, stateful objects that 
 import { Actor, ActorState, actors } from "@deco/actors";
 
 interface ICounter {
-    increment(): number;
-    getCount(): number;
+    increment(): Promise<number>;
+    getCount(): Promise<number>;
 }
 
 export default class Counter extends Actor implements ICounter {
