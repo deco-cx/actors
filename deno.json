@@ -13,8 +13,9 @@
   },
   "tasks": {
     "check": "deno fmt && deno lint --fix && deno check ./src/actors/mod.ts ./src/actors/hono/middleware.ts",
-    "test": "rm kv;deno test -A --unstable-kv ."
+    "test": "rm kv;deno test -A --unstable-kv .",
+    "release": "deno run -A jsr:@deco/scripts/release"
   },
   "lock": false,
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
