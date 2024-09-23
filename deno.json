@@ -1,0 +1,20 @@
+{
+  "name": "@deco/actors",
+  "exports": {
+    ".": "./src/actors/mod.ts",
+    "./hono": "./src/actors/hono/middleware.ts"
+  },
+  "imports": {
+    "@core/asyncutil": "jsr:@core/asyncutil@^1.1.1",
+    "@hono/hono": "jsr:@hono/hono@^4.6.2",
+    "@std/assert": "jsr:@std/assert@^1.0.5",
+    "@std/async": "jsr:@std/async@^1.0.5",
+    "@std/path": "jsr:@std/path@^1.0.6"
+  },
+  "tasks": {
+    "check": "deno fmt && deno lint --fix && deno check ./src/actors/mod.ts ./src/actors/hono/middleware.ts",
+    "test": "rm kv;deno test -A --unstable-kv ."
+  },
+  "lock": false,
+  "version": "0.0.0"
+}
