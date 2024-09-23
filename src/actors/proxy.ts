@@ -4,6 +4,9 @@ import {
   type ActorConstructor,
 } from "./runtime.ts";
 
+/**
+ * options to create a new actor proxy.
+ */
 export interface ProxyOptions<TInstance extends Actor> {
   actor: ActorConstructor<TInstance> | string;
   server: string;
@@ -15,6 +18,10 @@ type Promisify<Actor> = {
     : (...args: Args) => Promise<Return>
     : Actor[key];
 };
+
+/**
+ * utilities to create and manage actors.
+ */
 export const actors = {
   proxy: <TInstance extends Actor>(c: ProxyOptions<TInstance>) => {
     return {

@@ -2,7 +2,8 @@
   "name": "@deco/actors",
   "exports": {
     ".": "./src/actors/mod.ts",
-    "./hono": "./src/actors/hono/middleware.ts"
+    "./hono": "./src/actors/hono/middleware.ts",
+    "./proxy": "./src/actors/factory.ts"
   },
   "imports": {
     "@core/asyncutil": "jsr:@core/asyncutil@^1.1.1",

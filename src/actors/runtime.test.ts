@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { actors } from "./factory.ts";
+import { actors } from "./proxy.ts";
 import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 
