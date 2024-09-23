@@ -1,52 +1,39 @@
-export class Mutex {
-  private _queue: (() => void)[] = [];
+export class Mutex implements Disposable {
+  async [Symbol.dispose](): Promise<void> {
+    await this.wait();
+  }
   private _locked = false;
+  private _waiters: (() => void)[] = [];
 
-  // Returns an unlock function that can be called to release the lock
-  lock(): Disposable {
-    const unlockNext = () => {
-      if (this._queue.length > 0) {
-        const nextUnlock = this._queue.shift();
-        if (nextUnlock) {
-          nextUnlock();
-        }
-      } else {
-        this._locked = false;
-      }
-    };
-
-    if (this._locked) {
-      const waitUnlock = new Promise<void>((resolve) => {
-        this._queue.push(() => {
-          this._locked = true;
-          resolve();
-        });
-      });
-
-      // Wait for the lock to be available
-      waitUnlock.then(() => unlockNext);
-    } else {
+  lock(): Promise<Disposable> {
+    if (!this._locked) {
       this._locked = true;
+      return Promise.resolve({ [Symbol.dispose]: () => this.unlock() });
     }
 
-    return {
-      [Symbol.dispose]: () => {
-        return unlockNext();
-      },
-    };
+    return new Promise<Disposable>((resolve) => {
+      this._waiters.push(() => {
+        this._locked = true;
+        resolve({ [Symbol.dispose]: () => this.unlock() });
+      });
+    });
   }
 
-  // Waits until the lock is available
+  private unlock(): void {
+    this._locked = false;
+    const waiter = this._waiters.shift();
+    if (waiter) {
+      waiter();
+    }
+  }
+
   wait(): Promise<void> {
     if (!this._locked) {
       return Promise.resolve();
     }
 
-    return new Promise((resolve) => {
-      this._queue.push(() => {
-        this._locked = true;
-        resolve();
-      });
+    return new Promise<void>((resolve) => {
+      this._waiters.push(resolve);
     });
   }
 }

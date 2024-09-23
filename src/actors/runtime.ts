@@ -1,4 +1,4 @@
-import { Mutex } from "./async/mutex.ts";
+import { WaitGroup } from "@core/asyncutil";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 
@@ -22,8 +22,8 @@ const isInvocable = (f: never | Function): f is Function => {
 
 export interface ActorInvoker {
   actor: Actor;
-  reqMu: Mutex;
-  respMu: Mutex;
+  initialization: PromiseWithResolvers<void>;
+  respWaitGroup: WaitGroup;
 }
 
 export class ActorRuntime {
@@ -38,8 +38,8 @@ export class ActorRuntime {
       return;
     }
     this.actorsConstructors.forEach((Actor) => {
-      const reqMu = new Mutex();
-      const respMu = new Mutex();
+      const initialization = Promise.withResolvers<void>();
+      const respWaitGroup = new WaitGroup();
       // TODO how to commit uncommited changes?
       const storage = new DenoKvActorStorage({
         actorId,
@@ -47,15 +47,15 @@ export class ActorRuntime {
       });
       const actor = new Actor(
         new ActorState({
-          reqMu,
-          respMu,
+          initialization,
+          respWaitGroup,
           storage,
         }),
       );
       this.actors.set(Actor.name, {
         actor,
-        reqMu,
-        respMu,
+        initialization,
+        respWaitGroup,
       });
     });
     this.initilized = true;
@@ -83,7 +83,7 @@ export class ActorRuntime {
         status: 404,
       });
     }
-    const { actor, reqMu, respMu } = actorInvoker;
+    const { actor, initialization, respWaitGroup } = actorInvoker;
     const method = groups[METHOD_NAME_PATH_PARAM];
     if (!method || !(method in actor)) {
       return new Response(`method not found for the actor`, { status: 404 });
@@ -102,13 +102,11 @@ export class ActorRuntime {
         },
       );
     }
-    console.log("waiting");
-    await reqMu.wait();
-    console.log("finished");
+    await initialization.promise;
     const res = await (methodImpl as Function).bind(actor)(
       ...Array.isArray(args) ? args : [args],
     );
-    await respMu.wait();
+    await respWaitGroup.wait();
     return Response.json(res);
   }
 }

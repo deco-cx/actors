@@ -27,24 +27,26 @@ export default class Counter implements ICounter, Actor {
   }
 }
 
-const rt = new ActorRuntime([Counter]);
-const req = new Request(
-  "http://localhost:8000/actors/Counter/invoke/increment",
-  {
-    headers: {
-      [ACTOR_ID_HEADER_NAME]: "1234",
+Deno.test("counter test", async () => {
+  const rt = new ActorRuntime([Counter]);
+  const req = new Request(
+    "http://localhost:8000/actors/Counter/invoke/increment",
+    {
+      headers: {
+        [ACTOR_ID_HEADER_NAME]: "1234",
+      },
     },
-  },
-);
-const nullResp = await rt.fetch(req);
-assertEquals(await nullResp.text(), "1");
-const getReq = new Request(
-  "http://localhost:8000/actors/Counter/invoke/getCount",
-  {
-    headers: {
-      [ACTOR_ID_HEADER_NAME]: "1234",
+  );
+  const nullResp = await rt.fetch(req);
+  assertEquals(await nullResp.text(), "1");
+  const getReq = new Request(
+    "http://localhost:8000/actors/Counter/invoke/getCount",
+    {
+      headers: {
+        [ACTOR_ID_HEADER_NAME]: "1234",
+      },
     },
-  },
-);
-const oneResp = await rt.fetch(getReq);
-assertEquals(await oneResp.text(), "2");
+  );
+  const oneResp = await rt.fetch(getReq);
+  assertEquals(await oneResp.text(), "1");
+});
