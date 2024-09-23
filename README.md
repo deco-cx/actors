@@ -16,7 +16,7 @@ With **Actors**, developers create "actors" – isolated, stateful objects that
 can be invoked directly. Each actor is uniquely addressable, enabling efficient
 and straightforward interaction across distributed environments.
 
-## Key Features:
+## Key Features
 
 - **Simplified State Management:** Build stateful services using a
   straightforward programming model, without worrying about distributed systems
@@ -34,37 +34,34 @@ and straightforward interaction across distributed environments.
 ## Example: Simple Atomic Counter without Distributed Locks
 
 ```typescript
-import { Actor, actors, ActorState } from "@deco/actors";
+import { actors, ActorState } from "@deco/actors";
 
-interface ICounter {
-  increment(): Promise<number>;
-  getCount(): Promise<number>;
-}
-
-export default class Counter implements ICounter, Actor {
+class Counter {
   private count: number;
 
-  constructor(state: ActorState) {
-    super(state);
+  constructor(protected state: ActorState) {
     this.count = 0;
     state.blockConcurrencyWhile(async () => {
-      this.count = await this.getCount();
+      this.count = await this.state.storage.get<number>("counter") ?? 0;
     });
   }
 
   async increment(): Promise<number> {
-    let val = await this.state.storage.get("counter");
-    await this.state.storage.put("counter", ++val);
-    return val;
+    await this.state.storage.put("counter", ++this.count);
+    return this.count;
   }
 
-  async getCount(): Promise<number> {
-    return await this.state.storage.get("counter");
+  getCount(): number {
+    return this.count;
   }
 }
 
 // Invoking the counter actor
-const counter = actors.proxy<ICounter>({ id: "counter-1" });
+const counterProxy = actors.proxy({
+  actor: Counter,
+  server: "http://localhost:8000",
+});
+const counter = counterProxy.id("counter-id");
 // Increment counter
 await counter.increment();
 // Get current count

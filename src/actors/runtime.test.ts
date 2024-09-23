@@ -1,14 +1,9 @@
 import { assertEquals } from "@std/assert";
 import { actors } from "./factory.ts";
-import { type Actor, ActorRuntime } from "./runtime.ts";
+import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 
-interface ICounter {
-  increment(): Promise<number>;
-  getCount(): number;
-}
-
-class Counter implements ICounter, Actor {
+class Counter {
   private count: number;
 
   constructor(protected state: ActorState) {
