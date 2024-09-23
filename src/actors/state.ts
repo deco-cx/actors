@@ -4,6 +4,9 @@ export interface ActorStateOptions {
   initialization: PromiseWithResolvers<void>;
   storage: ActorStorage;
 }
+/**
+ * Represents the state of an actor.
+ */
 export class ActorState {
   public storage: ActorStorage;
   constructor(private options: ActorStateOptions) {

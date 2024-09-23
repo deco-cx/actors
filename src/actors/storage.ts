@@ -15,6 +15,9 @@ export interface ActorStoragePutOptions {
   noCache?: boolean;
 }
 
+/**
+ * Represents the storage of an actor.
+ */
 export interface ActorStorage {
   get<T = unknown>(
     key: string,

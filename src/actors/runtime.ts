@@ -1,14 +1,23 @@
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
-
+/**
+ * Represents an actor.
+ */
 // deno-lint-ignore no-empty-interface
 export interface Actor {
 }
 
+/**
+ * The name of the header used to specify the actor ID.
+ */
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 const ACTOR_NAME_PATH_PARAM = "actorName";
 const METHOD_NAME_PATH_PARAM = "methodName";
-const actorInvokeUrl = new URLPattern({
+
+/**
+ * The URL pattern for invoking an actor method.
+ */
+export const actorInvokeUrl = new URLPattern({
   pathname:
     `/actors/:${ACTOR_NAME_PATH_PARAM}/invoke/:${METHOD_NAME_PATH_PARAM}`,
 });
@@ -19,22 +28,51 @@ const isInvocable = (f: never | Function): f is Function => {
   return typeof f === "function";
 };
 
+/**
+ * Represents a constructor function for creating an actor instance.
+ * @template TInstance - The type of the actor instance.
+ */
 export type ActorConstructor<TInstance extends Actor = Actor> = new (
   state: ActorState,
 ) => TInstance;
+
+/**
+ * Represents an actor invoker.
+ */
 export interface ActorInvoker {
+  /**
+   * The actor instance.
+   */
   actor: Actor;
+  /**
+   * The actor state.
+   */
   state: ActorState;
+  /**
+   * A promise that resolves when the actor is initialized.
+   */
   initialization: PromiseWithResolvers<void>;
 }
 
+/**
+ * Represents the runtime for managing and invoking actors.
+ */
 export class ActorRuntime {
   private actors: Map<string, ActorInvoker> = new Map<string, ActorInvoker>();
   private initilized = false;
+  /**
+   * Creates an instance of ActorRuntime.
+   * @param actorsConstructors - An array of actor constructors.
+   */
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
   ) {
   }
+
+  /**
+   * Ensures that the actors are initialized for the given actor ID.
+   * @param actorId - The ID of the actor.
+   */
   ensureInitialized(actorId: string) {
     if (this.initilized) {
       return;
@@ -60,6 +98,12 @@ export class ActorRuntime {
     });
     this.initilized = true;
   }
+
+  /**
+   * Handles an incoming request and invokes the corresponding actor method.
+   * @param req - The incoming request.
+   * @returns A promise that resolves to the response.
+   */
   async fetch(req: Request) {
     const url = new URL(req.url);
     const actorId = req.headers.get(ACTOR_ID_HEADER_NAME);
