@@ -3,7 +3,15 @@
   "exports": {
     ".": "./src/actors/mod.ts",
     "./hono": "./src/actors/hono/middleware.ts",
-    "./proxy": "./src/actors/factory.ts"
+    "./proxy": "./src/actors/proxy.ts"
+  },
+  "publish": {
+    "exclude": [
+      "**/*.bench.ts",
+      "**/*.test.ts",
+      "MAINTAINERS.txt",
+      ".github"
+    ]
   },
   "imports": {
     "@core/asyncutil": "jsr:@core/asyncutil@^1.1.1",

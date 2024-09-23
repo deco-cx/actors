@@ -23,7 +23,9 @@ type Promisify<Actor> = {
  * utilities to create and manage actors.
  */
 export const actors = {
-  proxy: <TInstance extends Actor>(c: ProxyOptions<TInstance>) => {
+  proxy: <TInstance extends Actor>(
+    c: ProxyOptions<TInstance>,
+  ): { id: (id: string) => Promisify<TInstance> } => {
     return {
       id: (id: string): Promisify<TInstance> => {
         return new Proxy<Promisify<TInstance>>({} as Promisify<TInstance>, {
