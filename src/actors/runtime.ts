@@ -1,4 +1,3 @@
-import { WaitGroup } from "@core/asyncutil";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 
@@ -20,17 +19,20 @@ const isInvocable = (f: never | Function): f is Function => {
   return typeof f === "function";
 };
 
+export type ActorConstructor<TInstance extends Actor = Actor> = new (
+  state: ActorState,
+) => TInstance;
 export interface ActorInvoker {
   actor: Actor;
+  state: ActorState;
   initialization: PromiseWithResolvers<void>;
-  respWaitGroup: WaitGroup;
 }
 
 export class ActorRuntime {
   private actors: Map<string, ActorInvoker> = new Map<string, ActorInvoker>();
   private initilized = false;
   constructor(
-    protected actorsConstructors: Array<new (state: ActorState) => Actor>,
+    protected actorsConstructors: Array<ActorConstructor>,
   ) {
   }
   ensureInitialized(actorId: string) {
@@ -39,23 +41,21 @@ export class ActorRuntime {
     }
     this.actorsConstructors.forEach((Actor) => {
       const initialization = Promise.withResolvers<void>();
-      const respWaitGroup = new WaitGroup();
-      // TODO how to commit uncommited changes?
       const storage = new DenoKvActorStorage({
         actorId,
         actorName: Actor.name,
       });
+      const state = new ActorState({
+        initialization,
+        storage,
+      });
       const actor = new Actor(
-        new ActorState({
-          initialization,
-          respWaitGroup,
-          storage,
-        }),
+        state,
       );
       this.actors.set(Actor.name, {
         actor,
+        state,
         initialization,
-        respWaitGroup,
       });
     });
     this.initilized = true;
@@ -83,7 +83,7 @@ export class ActorRuntime {
         status: 404,
       });
     }
-    const { actor, initialization, respWaitGroup } = actorInvoker;
+    const { actor, initialization } = actorInvoker;
     const method = groups[METHOD_NAME_PATH_PARAM];
     if (!method || !(method in actor)) {
       return new Response(`method not found for the actor`, { status: 404 });
@@ -106,7 +106,6 @@ export class ActorRuntime {
     const res = await (methodImpl as Function).bind(actor)(
       ...Array.isArray(args) ? args : [args],
     );
-    await respWaitGroup.wait();
     return Response.json(res);
   }
 }

@@ -23,15 +23,21 @@ export class DenoKvActorStorage implements ActorStorage {
     this.atomicOp = options.atomicOp;
   }
 
-  atomic(_storage: (st: ActorStorage) => Promise<void>): Promise<void> {
+  async atomic(_storage: (st: ActorStorage) => Promise<void>): Promise<void> {
     if (this.kv instanceof Deno.AtomicOperation) {
       throw new Error(`not implemented`);
     }
+    const atomicOp = this.kv.atomic();
     const st = new DenoKvActorStorage({
       ...this.options,
-      atomicOp: this.kv.atomic(),
+      atomicOp,
     });
-    return _storage(st);
+    return await _storage(st).then(async () => {
+      const result = await atomicOp.commit();
+      if (!result.ok) {
+        throw new Error(`atomic operation failed`);
+      }
+    });
   }
 
   // Build the full key based on actor name, id, and provided key
@@ -99,7 +105,7 @@ export class DenoKvActorStorage implements ActorStorage {
       batch.delete(this.buildKey(key));
       deletedCount++;
     }
-    await batch.commit();
+    !this.atomicOp && await batch.commit();
 
     return Array.isArray(keys) ? deletedCount : deletedCount > 0;
   }
@@ -113,7 +119,7 @@ export class DenoKvActorStorage implements ActorStorage {
       batch.delete(this.buildKey(key));
     }
 
-    await batch.commit();
+    !this.atomicOp && await batch.commit();
   }
 
   // List records in the storage with optional range and filtering

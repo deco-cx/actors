@@ -6,10 +6,8 @@ import type {
   ActorStoragePutOptions,
 } from "../storage.ts";
 
-export class DurableStorage implements ActorStorage {
+export class CachedStorage implements ActorStorage {
   protected cache: Map<string, any> = new Map<string, any>();
-  protected uncommittedChanges: Map<string, any> = new Map<string, any>();
-  protected toDelete: Set<string> = new Set<string>();
 
   constructor(protected innerStorage: ActorStorage) {}
 
@@ -79,36 +77,18 @@ export class DurableStorage implements ActorStorage {
     valueOrOptions?: T | ActorStoragePutOptions,
     options?: ActorStoragePutOptions,
   ): Promise<void> {
-    if (typeof keyOrEntries === "string") {
-      // Single key-value put
-      const key = keyOrEntries;
-      const value = valueOrOptions as T;
-      const { allowUnconfirmed } = options || {};
-      this.cache.set(key, value);
-      if (allowUnconfirmed) {
-        await this.innerStorage.put(key, value, options);
-      } else {
-        this.uncommittedChanges.set(key, value);
-      }
-    } else {
-      // Multiple entries put
-      const entries = keyOrEntries as Record<string, T>;
-      const { allowUnconfirmed } = (valueOrOptions as ActorStoragePutOptions) ||
-        {};
-
-      for (const key in entries) {
-        this.cache.set(key, entries[key]);
-        if (!allowUnconfirmed) {
-          this.uncommittedChanges.set(key, entries[key]);
-        }
-      }
-
-      if (allowUnconfirmed) {
-        await this.innerStorage.put(
-          entries,
-          valueOrOptions as ActorStoragePutOptions,
-        );
-      }
+    const entries = typeof keyOrEntries === "string"
+      ? { [keyOrEntries]: valueOrOptions as T }
+      : keyOrEntries;
+    // Multiple entries put
+    await this.innerStorage.put(
+      entries,
+      (typeof keyOrEntries === "string"
+        ? options
+        : valueOrOptions) as ActorStoragePutOptions,
+    );
+    for (const key in entries) {
+      this.cache.set(key, entries[key]);
     }
   }
 
@@ -125,59 +105,22 @@ export class DurableStorage implements ActorStorage {
     keyOrKeys: string | string[],
     options?: ActorStoragePutOptions,
   ): Promise<boolean | number> {
-    const { allowUnconfirmed } = options || {};
-
-    if (typeof keyOrKeys === "string") {
-      // Single key delete
-      const key = keyOrKeys;
-      this.cache.delete(key);
-      if (allowUnconfirmed) {
-        return await this.innerStorage.delete(key, options);
-      } else {
-        this.toDelete.add(key);
-        return true;
-      }
-    } else {
-      // Multiple keys delete
-      const keys = keyOrKeys;
-      keys.forEach((key) => this.cache.delete(key));
-      if (allowUnconfirmed) {
-        return await this.innerStorage.delete(keys, options);
-      } else {
-        keys.forEach((key) => this.toDelete.add(key));
-        return keys.length;
-      }
-    }
+    const keys = typeof keyOrKeys === "string" ? [keyOrKeys] : keyOrKeys;
+    // Multiple keys delete
+    const result = await this.innerStorage.delete(
+      keys,
+      options,
+    );
+    keys.forEach((key) => this.cache.delete(key));
+    return result;
   }
 
   async deleteAll(options?: ActorStoragePutOptions): Promise<void> {
-    const { allowUnconfirmed } = options || {};
     this.cache.clear();
-    if (allowUnconfirmed) {
-      this.toDelete.clear();
-    } else {
-      await this.innerStorage.deleteAll(options);
-    }
+    await this.innerStorage.deleteAll(options);
   }
 
   async atomic(storage: (st: ActorStorage) => Promise<void>): Promise<void> {
     await storage(this);
-    await this.commit();
-  }
-
-  async commit(): Promise<void> {
-    await this.innerStorage.atomic(async (st) => {
-      // Commit uncommitted changes
-      for (const [key, value] of this.uncommittedChanges.entries()) {
-        await st.put(key, value);
-      }
-      this.uncommittedChanges.clear();
-
-      // Commit deletes
-      if (this.toDelete.size > 0) {
-        await st.delete([...this.toDelete]);
-        this.toDelete.clear();
-      }
-    });
   }
 }

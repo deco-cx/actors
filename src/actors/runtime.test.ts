@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { type Actor, ACTOR_ID_HEADER_NAME, ActorRuntime } from "./runtime.ts";
+import { actors } from "./factory.ts";
+import { type Actor, ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 
 interface ICounter {
@@ -7,7 +8,7 @@ interface ICounter {
   getCount(): number;
 }
 
-export default class Counter implements ICounter, Actor {
+class Counter implements ICounter, Actor {
   private count: number;
 
   constructor(protected state: ActorState) {
@@ -27,26 +28,35 @@ export default class Counter implements ICounter, Actor {
   }
 }
 
-Deno.test("counter test", async () => {
+const runServer = (rt: ActorRuntime): AsyncDisposable => {
+  const server = Deno.serve(rt.fetch.bind(rt));
+  return {
+    async [Symbol.asyncDispose]() {
+      await server.shutdown();
+    },
+  };
+};
+
+Deno.test("counter increment and getCount", async () => {
   const rt = new ActorRuntime([Counter]);
-  const req = new Request(
-    "http://localhost:8000/actors/Counter/invoke/increment",
-    {
-      headers: {
-        [ACTOR_ID_HEADER_NAME]: "1234",
-      },
-    },
-  );
-  const nullResp = await rt.fetch(req);
-  assertEquals(await nullResp.text(), "1");
-  const getReq = new Request(
-    "http://localhost:8000/actors/Counter/invoke/getCount",
-    {
-      headers: {
-        [ACTOR_ID_HEADER_NAME]: "1234",
-      },
-    },
-  );
-  const oneResp = await rt.fetch(getReq);
-  assertEquals(await oneResp.text(), "1");
+  await using _server = runServer(rt);
+  const actorId = "1234";
+  const counterProxy = actors.proxy({
+    actor: Counter,
+    server: "http://localhost:8000",
+  });
+
+  const actor = counterProxy.id(actorId);
+  // Test increment
+  const number = await actor.increment();
+  assertEquals(number, 1);
+
+  // Test getCount
+  assertEquals(await actor.getCount(), 1);
+
+  // Test increment again
+  assertEquals(await actor.increment(), 2);
+
+  // Test getCount again
+  assertEquals(await actor.getCount(), 2);
 });

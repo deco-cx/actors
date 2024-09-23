@@ -5,17 +5,13 @@ export interface ActorStorageListOptions {
   prefix?: string;
   reverse?: boolean;
   limit?: number;
-  allowConcurrency?: boolean;
   noCache?: boolean;
 }
 export interface ActorStorageGetOptions {
-  allowConcurrency?: boolean;
   noCache?: boolean;
 }
 
 export interface ActorStoragePutOptions {
-  allowConcurrency?: boolean;
-  allowUnconfirmed?: boolean;
   noCache?: boolean;
 }
 
