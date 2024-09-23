@@ -16,5 +16,5 @@
     "test": "rm kv;deno test -A --unstable-kv ."
   },
   "lock": false,
-  "version": "0.0.0"
+  "version": "0.1.0"
 }
