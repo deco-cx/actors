@@ -19,12 +19,17 @@ type Promisify<Actor> = {
     : Actor[key];
 };
 
+const ACTORS_SERVER_URL: string | undefined = Deno.env.get(
+  "DENO_ACTORS_SERVER_URL",
+);
+const DEPLOYMENT: string | undefined = Deno.env.get("DENO_DEPLOYMENT_ID");
 /**
  * utilities to create and manage actors.
  */
 export const actors = {
   proxy: <TInstance extends Actor>(
-    c: ProxyOptions<TInstance>,
+    actor: ActorConstructor<TInstance> | string,
+    server = ACTORS_SERVER_URL,
   ): { id: (id: string) => Promisify<TInstance> } => {
     return {
       id: (id: string): Promisify<TInstance> => {
@@ -32,14 +37,17 @@ export const actors = {
           get: (_, prop) => {
             return async (...args: unknown[]) => {
               const resp = await fetch(
-                `${c.server}/actors/${
-                  typeof c.actor === "string" ? c.actor : c.actor.name
+                `${server}/actors/${
+                  typeof actor === "string" ? actor : actor.name
                 }/invoke/${String(prop)}`,
                 {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
                     [ACTOR_ID_HEADER_NAME]: id,
+                    ...DEPLOYMENT
+                      ? { ["x-deno-deployment-id"]: DEPLOYMENT }
+                      : {},
                   },
                   body: JSON.stringify({
                     args,
