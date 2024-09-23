@@ -1,3 +1,5 @@
+<a href="https://jsr.io/@deco/actors" target="_blank"><img alt="jsr" src="https://jsr.io/badges/@deco/actors" /></a>
+
 # Actors
 
 High-scale interactive services often demand a combination of high throughput,
