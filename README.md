@@ -22,7 +22,7 @@ interface ICounter {
     getCount(): Promise<number>;
 }
 
-export default class Counter extends Actor implements ICounter {
+export default class Counter implements ICounter, Actor {
     private count: number;
 
     constructor(state: ActorState) {
