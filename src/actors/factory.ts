@@ -5,7 +5,7 @@ import {
 } from "./runtime.ts";
 
 export interface ProxyOptions<TInstance extends Actor> {
-  actor: ActorConstructor<TInstance>;
+  actor: ActorConstructor<TInstance> | string;
   server: string;
 }
 
@@ -23,7 +23,9 @@ export const actors = {
           get: (_, prop) => {
             return async (...args: unknown[]) => {
               const resp = await fetch(
-                `${c.server}/actors/${c.actor.name}/invoke/${String(prop)}`,
+                `${c.server}/actors/${
+                  typeof c.actor === "string" ? c.actor : c.actor.name
+                }/invoke/${String(prop)}`,
                 {
                   method: "POST",
                   headers: {

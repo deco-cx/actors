@@ -104,7 +104,7 @@ export class ActorRuntime {
    * @param req - The incoming request.
    * @returns A promise that resolves to the response.
    */
-  async fetch(req: Request) {
+  async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const actorId = req.headers.get(ACTOR_ID_HEADER_NAME);
     if (!actorId) {

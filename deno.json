@@ -12,7 +12,7 @@
     "@std/path": "jsr:@std/path@^1.0.6"
   },
   "tasks": {
-    "check": "deno fmt && deno lint --fix && deno check ./src/mod.ts",
+    "check": "deno fmt && deno lint --fix && deno check ./src/actors/mod.ts ./src/actors/hono/middleware.ts",
     "test": "rm kv;deno test -A --unstable-kv ."
   },
   "lock": false,
