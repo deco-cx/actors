@@ -3,7 +3,8 @@
   "exports": {
     ".": "./src/actors/mod.ts",
     "./hono": "./src/actors/hono/middleware.ts",
-    "./proxy": "./src/actors/proxy.ts"
+    "./proxy": "./src/actors/proxy.ts",
+    "./watch": "./src/actors/util/watch.ts"
   },
   "publish": {
     "exclude": [
