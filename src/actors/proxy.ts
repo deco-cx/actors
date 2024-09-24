@@ -26,6 +26,7 @@ export interface ActorsServer {
 const IS_BROWSER = typeof document !== "undefined";
 
 let _server: ActorsServer | null = null;
+const isLayeredUrl = (url: string): boolean => url.includes("layers");
 const initServer = (): ActorsServer => {
   if (IS_BROWSER) {
     return {
@@ -43,7 +44,9 @@ const initServer = (): ActorsServer => {
       "DECO_ACTORS_SERVER_URL",
     ) ??
       fallbackUrl ?? "",
-    deploymentId,
+    deploymentId: deploymentId && isLayeredUrl(deploymentId)
+      ? deploymentId
+      : undefined,
   };
 };
 
