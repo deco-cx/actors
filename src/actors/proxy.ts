@@ -19,11 +19,11 @@ type Promisify<Actor> = {
     : Actor[key];
 };
 
-const DENO_ACTORS_SERVER_URL: string | undefined = Deno.env.get(
-  "DENO_ACTORS_SERVER_URL",
+const DECO_ACTORS_SERVER_URL: string | undefined = Deno.env.get(
+  "DECO_ACTORS_SERVER_URL",
 );
 const DEPLOYMENT: string | undefined = Deno.env.get("DENO_DEPLOYMENT_ID");
-const ACTORS_SERVER_URL = DENO_ACTORS_SERVER_URL ??
+const ACTORS_SERVER_URL = DECO_ACTORS_SERVER_URL ??
   (typeof DEPLOYMENT === "string"
     ? undefined
     : `http://localhost:${Deno.env.get("PORT") ?? 8000}`);
