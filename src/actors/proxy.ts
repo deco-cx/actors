@@ -19,17 +19,22 @@ type Promisify<Actor> = {
     : Actor[key];
 };
 
-const ACTORS_SERVER_URL: string | undefined = Deno.env.get(
+const DENO_ACTORS_SERVER_URL: string | undefined = Deno.env.get(
   "DENO_ACTORS_SERVER_URL",
 );
 const DEPLOYMENT: string | undefined = Deno.env.get("DENO_DEPLOYMENT_ID");
+const ACTORS_SERVER_URL = DENO_ACTORS_SERVER_URL ??
+  (typeof DEPLOYMENT === "string"
+    ? undefined
+    : `http://localhost:${Deno.env.get("PORT") ?? 8000}`);
+
 /**
  * utilities to create and manage actors.
  */
 export const actors = {
   proxy: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance> | string,
-    server = ACTORS_SERVER_URL,
+    server: string | undefined = ACTORS_SERVER_URL,
   ): { id: (id: string) => Promisify<TInstance> } => {
     return {
       id: (id: string): Promisify<TInstance> => {

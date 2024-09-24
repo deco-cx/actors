@@ -36,10 +36,7 @@ Deno.test("counter increment and getCount", async () => {
   const rt = new ActorRuntime([Counter]);
   await using _server = runServer(rt);
   const actorId = "1234";
-  const counterProxy = actors.proxy({
-    actor: Counter,
-    server: "http://localhost:8000",
-  });
+  const counterProxy = actors.proxy(Counter);
 
   const actor = counterProxy.id(actorId);
   // Test increment
