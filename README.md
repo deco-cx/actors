@@ -59,11 +59,7 @@ class Counter {
 }
 
 // Invoking the counter actor
-const counterProxy = actors.proxy({
-  actor: Counter,
-  server: "http://localhost:8000",
-});
-const counter = counterProxy.id("counter-id");
+const counter = actors.proxy(Counter).id("counter-id");
 // Increment counter
 await counter.increment();
 // Get current count
