@@ -26,5 +26,5 @@
     "release": "deno run -A jsr:@deco/scripts/release"
   },
   "lock": false,
-  "version": "0.1.4"
+  "version": "0.1.5"
 }
