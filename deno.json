@@ -14,6 +14,13 @@
       ".github"
     ]
   },
+  "compilerOptions": {
+    "lib": [
+      "deno.ns",
+      "dom",
+      "deno.unstable"
+    ]
+  },
   "imports": {
     "@core/asyncutil": "jsr:@core/asyncutil@^1.1.1",
     "@hono/hono": "jsr:@hono/hono@^4.6.2",
