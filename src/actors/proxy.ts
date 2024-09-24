@@ -1,9 +1,7 @@
-import {
-  type Actor,
-  ACTOR_ID_HEADER_NAME,
-  type ActorConstructor,
-} from "./runtime.ts";
+import type { Actor, ActorConstructor } from "./runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
+
+export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 
 /**
  * options to create a new actor proxy.
@@ -20,14 +18,34 @@ type Promisify<Actor> = {
     : Actor[key];
 };
 
-const DECO_ACTORS_SERVER_URL: string | undefined = Deno.env.get(
-  "DECO_ACTORS_SERVER_URL",
-);
-const DEPLOYMENT: string | undefined = Deno.env.get("DENO_DEPLOYMENT_ID");
-const ACTORS_SERVER_URL = DECO_ACTORS_SERVER_URL ??
-  (typeof DEPLOYMENT === "string"
+export interface ActorsServer {
+  url: string;
+  deploymentId?: string;
+}
+
+const IS_BROWSER = typeof document !== "undefined";
+
+let _server: ActorsServer | null = null;
+const initServer = (): ActorsServer => {
+  if (IS_BROWSER) {
+    return {
+      url: "", // relative
+    };
+  }
+
+  const deploymentId = Deno.env.get("DENO_DEPLOYMENT_ID");
+  const fallbackUrl = typeof deploymentId === "string"
     ? undefined
-    : `http://localhost:${Deno.env.get("PORT") ?? 8000}`);
+    : `http://localhost:${Deno.env.get("PORT") ?? 8000}`;
+
+  return {
+    url: Deno.env.get(
+      "DECO_ACTORS_SERVER_URL",
+    ) ??
+      fallbackUrl ?? "",
+    deploymentId,
+  };
+};
 
 /**
  * utilities to create and manage actors.
@@ -35,8 +53,12 @@ const ACTORS_SERVER_URL = DECO_ACTORS_SERVER_URL ??
 export const actors = {
   proxy: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance> | string,
-    server: string | undefined = ACTORS_SERVER_URL,
+    server?: ActorsServer | undefined,
   ): { id: (id: string) => Promisify<TInstance> } => {
+    if (!server) {
+      _server ??= initServer();
+    }
+    const actorsServer = server ?? _server!;
     return {
       id: (id: string): Promisify<TInstance> => {
         return new Proxy<Promisify<TInstance>>({} as Promisify<TInstance>, {
@@ -44,7 +66,7 @@ export const actors = {
             return async (...args: unknown[]) => {
               const abortCtrl = new AbortController();
               const resp = await fetch(
-                `${server}/actors/${
+                `${actorsServer.url}/actors/${
                   typeof actor === "string" ? actor : actor.name
                 }/invoke/${String(prop)}`,
                 {
@@ -53,8 +75,8 @@ export const actors = {
                   headers: {
                     "Content-Type": "application/json",
                     [ACTOR_ID_HEADER_NAME]: id,
-                    ...DEPLOYMENT
-                      ? { ["x-deno-deployment-id"]: DEPLOYMENT }
+                    ...actorsServer.deploymentId
+                      ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
                       : {},
                   },
                   body: JSON.stringify({

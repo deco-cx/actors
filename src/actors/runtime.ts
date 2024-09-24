@@ -1,4 +1,5 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
+import { ACTOR_ID_HEADER_NAME } from "./proxy.ts";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
@@ -21,7 +22,6 @@ const isEventStreamResponse = (
 /**
  * The name of the header used to specify the actor ID.
  */
-export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 const ACTOR_NAME_PATH_PARAM = "actorName";
 const METHOD_NAME_PATH_PARAM = "methodName";
 
