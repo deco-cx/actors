@@ -3,6 +3,7 @@ import {
   ACTOR_ID_HEADER_NAME,
   type ActorConstructor,
 } from "./runtime.ts";
+import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
 
 /**
  * options to create a new actor proxy.
@@ -41,12 +42,14 @@ export const actors = {
         return new Proxy<Promisify<TInstance>>({} as Promisify<TInstance>, {
           get: (_, prop) => {
             return async (...args: unknown[]) => {
+              const abortCtrl = new AbortController();
               const resp = await fetch(
                 `${server}/actors/${
                   typeof actor === "string" ? actor : actor.name
                 }/invoke/${String(prop)}`,
                 {
                   method: "POST",
+                  signal: abortCtrl.signal,
                   headers: {
                     "Content-Type": "application/json",
                     [ACTOR_ID_HEADER_NAME]: id,
@@ -59,6 +62,18 @@ export const actors = {
                   }),
                 },
               );
+              if (
+                resp.headers.get("content-type") ===
+                  EVENT_STREAM_RESPONSE_HEADER
+              ) {
+                const iterator = readFromStream(resp);
+                const retn = iterator.return;
+                iterator.return = function (val) {
+                  abortCtrl.abort();
+                  return retn?.call(iterator, val) ?? val;
+                };
+                return iterator;
+              }
               return resp.json();
             };
           },
