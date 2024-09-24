@@ -83,7 +83,7 @@ export const actors = {
                       : {},
                   },
                   body: JSON.stringify({
-                    args,
+                    args: args ?? [],
                   }),
                 },
               );

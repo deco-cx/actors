@@ -144,7 +144,7 @@ export class ActorRuntime {
       return new Response(`method not found for the actor`, { status: 404 });
     }
     let args = [];
-    if (req.headers.get("content-length") !== null) {
+    if (req.headers.get("content-type")?.includes("application/json")) {
       const { args: margs } = await req.json();
       args = margs;
     }
