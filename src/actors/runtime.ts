@@ -1,5 +1,8 @@
+import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
+import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
+
 /**
  * Represents an actor.
  */
@@ -7,6 +10,14 @@ import { DenoKvActorStorage } from "./storage/denoKv.ts";
 export interface Actor {
 }
 
+const isEventStreamResponse = (
+  invokeResponse: unknown | AsyncIterableIterator<unknown>,
+): invokeResponse is AsyncIterableIterator<unknown> => {
+  return (
+    typeof (invokeResponse as AsyncIterableIterator<unknown>)?.next ===
+      "function"
+  );
+};
 /**
  * The name of the header used to specify the actor ID.
  */
@@ -150,6 +161,34 @@ export class ActorRuntime {
     const res = await (methodImpl as Function).bind(actor)(
       ...Array.isArray(args) ? args : [args],
     );
+    if (isEventStreamResponse(res)) {
+      req.signal.onabort = () => {
+        res?.return?.();
+      };
+
+      return new Response(
+        new ReadableStream<ServerSentEventMessage>({
+          async pull(controller) {
+            for await (const content of res) {
+              controller.enqueue({
+                data: encodeURIComponent(JSON.stringify(content)),
+                id: Date.now(),
+                event: "message",
+              });
+            }
+            controller.close();
+          },
+          cancel() {
+            res?.return?.();
+          },
+        }).pipeThrough(new ServerSentEventStream()),
+        {
+          headers: {
+            "Content-Type": EVENT_STREAM_RESPONSE_HEADER,
+          },
+        },
+      );
+    }
     return Response.json(res);
   }
 }
