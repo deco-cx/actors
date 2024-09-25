@@ -11,7 +11,9 @@ export interface StorageOptions {
   atomicOp?: AtomicOp;
 }
 
-const kv = await Deno.openKv(join(Deno.cwd(), "kv"));
+const ACTORS_KV_DATABASE = Deno.env.get("ACTORS_KV_DATABASE") ??
+  join(Deno.cwd(), "kv");
+const kv = await Deno.openKv(ACTORS_KV_DATABASE);
 
 interface AtomicOp {
   kv: Deno.AtomicOperation;
