@@ -99,6 +99,9 @@ export const actors = {
                 };
                 return iterator;
               }
+              if (resp.status === 204) {
+                return;
+              }
               return resp.json();
             };
           },

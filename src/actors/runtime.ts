@@ -189,6 +189,9 @@ export class ActorRuntime {
         },
       );
     }
+    if (typeof res === "undefined") {
+      return new Response(null, { status: 204 });
+    }
     return Response.json(res);
   }
 }
