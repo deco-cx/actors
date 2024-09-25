@@ -13,6 +13,11 @@ export interface StorageOptions {
 
 const ACTORS_KV_DATABASE = Deno.env.get("ACTORS_KV_DATABASE") ??
   join(Deno.cwd(), "kv");
+
+const ACTORS_DENO_KV_TOKEN = Deno.env.get("ACTORS_DENO_KV_TOKEN");
+ACTORS_DENO_KV_TOKEN &&
+  Deno.env.set("DENO_KV_ACCESS_TOKEN", ACTORS_DENO_KV_TOKEN);
+
 const kv = await Deno.openKv(ACTORS_KV_DATABASE);
 
 interface AtomicOp {
