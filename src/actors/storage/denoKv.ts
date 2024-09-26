@@ -15,6 +15,7 @@ const ACTORS_KV_DATABASE = Deno.env.get("ACTORS_KV_DATABASE") ??
   join(Deno.cwd(), "kv");
 
 const ACTORS_DENO_KV_TOKEN = Deno.env.get("ACTORS_DENO_KV_TOKEN");
+// this is necessary since deno cluster does not allow inject DENO_* env vars. so this is a workaround to make it work.
 ACTORS_DENO_KV_TOKEN &&
   Deno.env.set("DENO_KV_ACCESS_TOKEN", ACTORS_DENO_KV_TOKEN);
 
