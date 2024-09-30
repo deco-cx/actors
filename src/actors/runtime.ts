@@ -1,5 +1,5 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
-import { isUpgrade, makeWebSocket } from "./channels/channel.ts";
+import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "./proxy.ts";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";

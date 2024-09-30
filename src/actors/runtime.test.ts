@@ -1,8 +1,8 @@
 import { assertEquals, assertFalse } from "@std/assert";
-import type { ChannelUpgrader } from "./channels/channel.ts";
 import { actors } from "./proxy.ts";
 import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
+import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
 class Counter {

@@ -1,10 +1,10 @@
+import type { Actor, ActorConstructor } from "./runtime.ts";
+import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
 import {
   type ChannelUpgrader,
   type DuplexChannel,
   makeWebSocket,
-} from "./channels/channel.ts";
-import type { Actor, ActorConstructor } from "./runtime.ts";
-import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
+} from "./util/channels/channel.ts";
 
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "x-deno-isolate-instance-id";
