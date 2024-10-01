@@ -8,8 +8,23 @@ import type {
 
 export class CachedStorage implements ActorStorage {
   protected cache: Map<string, any> = new Map<string, any>();
+  protected alarm: Promise<number | null> | null = null;
 
   constructor(protected innerStorage: ActorStorage) {}
+  setAlarm(dt: number): Promise<void> {
+    return this.innerStorage.setAlarm(dt).then(() => {
+      this.alarm = Promise.resolve(dt);
+    });
+  }
+  getAlarm(): Promise<number | null> {
+    this.alarm ??= this.innerStorage.getAlarm();
+    return this.alarm;
+  }
+  deleteAlarm(): Promise<void> {
+    return this.innerStorage.deleteAlarm().then(() => {
+      this.alarm = null;
+    });
+  }
 
   private async getMany<T = unknown>(
     keys: string[][],

@@ -2,6 +2,7 @@ import { assertEquals, assertFalse } from "@std/assert";
 import { actors } from "./proxy.ts";
 import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
+import { triggerAlarms } from "./storage/denoKv/alarms.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
@@ -21,6 +22,13 @@ class Counter {
     await this.state.storage.put("counter", this.count);
     this.watchTarget.notify(this.count);
     return this.count;
+  }
+  async scheduleIncrement(): Promise<void> {
+    await this.state.storage.setAlarm(Date.now() + 1); // next tick
+  }
+
+  async alarm() {
+    await this.increment();
   }
 
   async decrement(): Promise<number> {
@@ -110,4 +118,10 @@ Deno.test("counter tests", async () => {
     assertEquals(done, false);
   }
   watcher.return?.();
+
+  const counterWatcher = await actor.watch();
+  await actor.scheduleIncrement();
+  await triggerAlarms();
+  assertEquals(await counterWatcher.next().then((x) => x.value), 2);
+  counterWatcher.return?.();
 });

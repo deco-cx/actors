@@ -3,7 +3,8 @@ import type {
   ActorStorage,
   ActorStorageListOptions,
   ActorStoragePutOptions,
-} from "../storage.ts";
+} from "../../storage.ts";
+import { Alarms } from "./alarms.ts";
 
 export interface StorageOptions {
   actorName: string;
@@ -18,7 +19,9 @@ const ACTORS_DENO_KV_TOKEN = Deno.env.get("ACTORS_DENO_KV_TOKEN");
 ACTORS_DENO_KV_TOKEN &&
   Deno.env.set("DENO_KV_ACCESS_TOKEN", ACTORS_DENO_KV_TOKEN);
 
-const kv = await Deno.openKv(ACTORS_KV_DATABASE);
+export const kv = await Deno.openKv(ACTORS_KV_DATABASE);
+
+const ALARM_KEY = "alarm";
 
 interface AtomicOp {
   kv: Deno.AtomicOperation;
@@ -34,6 +37,24 @@ export class DenoKvActorStorage implements ActorStorage {
     this.kv = kv;
     this.kvOrTransaction = options.atomicOp?.kv ?? kv;
     this.atomicOp = options.atomicOp;
+  }
+  async setAlarm(dt: number): Promise<void> {
+    await Alarms.schedule({
+      actorId: this.options.actorId,
+      actorName: this.options.actorName,
+      triggerAt: dt,
+    });
+  }
+  async getAlarm(): Promise<number | null> {
+    return await Alarms.get(
+      {
+        actorId: this.options.actorId,
+        actorName: this.options.actorName,
+      },
+    ).then((alarm) => alarm.value?.triggerAt ?? null);
+  }
+  async deleteAlarm(): Promise<void> {
+    await this.delete(ALARM_KEY);
   }
 
   async atomic(_storage: (st: ActorStorage) => Promise<void>): Promise<void> {
@@ -62,7 +83,8 @@ export class DenoKvActorStorage implements ActorStorage {
 
   // Build the full key based on actor name, id, and provided key
   buildKey(key: string[]): string[] {
-    return [this.options.actorName, this.options.actorId, ...key];
+    // id should come first as multiples actors name can share same id
+    return [this.options.actorId, this.options.actorName, ...key];
   }
 
   // Single get method that handles both single and multiple keys
@@ -128,6 +150,10 @@ export class DenoKvActorStorage implements ActorStorage {
   ): Promise<boolean>;
   async delete(
     keys: string[][],
+    options?: ActorStoragePutOptions,
+  ): Promise<number>;
+  async delete(
+    keys: string,
     options?: ActorStoragePutOptions,
   ): Promise<number>;
   async delete(
