@@ -1,7 +1,75 @@
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
+import {
+  type ChannelUpgrader,
+  type DuplexChannel,
+  makeWebSocket,
+} from "./util/channels/channel.ts";
 
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
+export const ACTOR_ID_QS_NAME = "x-deno-isolate-instance-id";
+/**
+ * Promise.prototype.then onfufilled callback type.
+ */
+export type Fulfilled<R, T> = ((result: R) => T | PromiseLike<T>) | null;
+
+/**
+ * Promise.then onrejected callback type.
+ */
+// deno-lint-ignore no-explicit-any
+export type Rejected<E> = ((reason: any) => E | PromiseLike<E>) | null;
+
+export class ActorAwaiter<
+  TResponse,
+  TChannel extends DuplexChannel<unknown, unknown>,
+> implements
+  PromiseLike<
+    TResponse
+  >,
+  DuplexChannel<unknown, unknown> {
+  ch: Promise<TChannel> | null = null;
+  constructor(
+    protected fetcher: () => Promise<
+      TResponse
+    >,
+    protected ws: () => Promise<TChannel>,
+  ) {
+  }
+  async close() {
+    const ch = await this.channel;
+    await ch.close();
+  }
+
+  async *recv(signal?: AbortSignal): AsyncIterableIterator<unknown> {
+    const ch = await this.channel;
+    yield* ch.recv(signal);
+  }
+
+  private get channel(): Promise<TChannel> {
+    return this.ch ??= this.ws();
+  }
+
+  async send(value: unknown): Promise<void> {
+    const ch = await this.channel;
+    await ch.send(value);
+  }
+
+  catch<TResult>(onrejected: Rejected<TResult>): Promise<TResponse | TResult> {
+    return this.fetcher().catch(onrejected);
+  }
+
+  then<TResult1, TResult2 = TResult1>(
+    onfufilled?: Fulfilled<
+      TResponse,
+      TResult1
+    >,
+    onrejected?: Rejected<TResult2>,
+  ): Promise<TResult1 | TResult2> {
+    return this.fetcher().then(onfufilled).catch(
+      onrejected,
+    );
+  }
+}
 
 /**
  * options to create a new actor proxy.
@@ -11,11 +79,15 @@ export interface ProxyOptions<TInstance extends Actor> {
   server: string;
 }
 
+type PromisifyKey<key extends keyof Actor, Actor> = Actor[key] extends
+  (...args: infer Args) => Awaited<infer Return>
+  ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
+    ? (...args: Args) => DuplexChannel<TSend, TReceive>
+  : (...args: Args) => Promise<Return>
+  : Actor[key];
+
 type Promisify<Actor> = {
-  [key in keyof Actor]: Actor[key] extends (...args: infer Args) => infer Return
-    ? Return extends Promise<unknown> ? Actor[key]
-    : (...args: Args) => Promise<Return>
-    : Actor[key];
+  [key in keyof Actor]: PromisifyKey<key, Actor>;
 };
 
 export interface ActorsServer {
@@ -66,12 +138,13 @@ export const actors = {
       id: (id: string): Promisify<TInstance> => {
         return new Proxy<Promisify<TInstance>>({} as Promisify<TInstance>, {
           get: (_, prop) => {
-            return async (...args: unknown[]) => {
+            const endpoint = `${actorsServer.url}/actors/${
+              typeof actor === "string" ? actor : actor.name
+            }/invoke/${String(prop)}`;
+            const fetcher = async (...args: unknown[]) => {
               const abortCtrl = new AbortController();
               const resp = await fetch(
-                `${actorsServer.url}/actors/${
-                  typeof actor === "string" ? actor : actor.name
-                }/invoke/${String(prop)}`,
+                endpoint,
                 {
                   method: "POST",
                   signal: abortCtrl.signal,
@@ -103,6 +176,19 @@ export const actors = {
                 return;
               }
               return resp.json();
+            };
+            return (...args: unknown[]) => {
+              const awaiter = new ActorAwaiter(() => fetcher(...args), () => {
+                const ws = new WebSocket(
+                  `${endpoint}?args=${
+                    encodeURIComponent(
+                      btoa(JSON.stringify({ args: args ?? [] })),
+                    )
+                  }&${ACTOR_ID_QS_NAME}=${id}`,
+                );
+                return makeWebSocket(ws);
+              });
+              return awaiter;
             };
           },
         });

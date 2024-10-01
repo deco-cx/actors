@@ -1,7 +1,8 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertFalse } from "@std/assert";
 import { actors } from "./proxy.ts";
 import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
+import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
 class Counter {
@@ -36,6 +37,17 @@ class Counter {
   watch(): AsyncIterableIterator<number> {
     return this.watchTarget.subscribe();
   }
+
+  chan(name: string): ChannelUpgrader<string, string> {
+    return (async ({ send, recv }) => {
+      await send(`Hello ${name}`);
+      for await (const str of recv()) {
+        if (str === "PING") {
+          await send("PONG");
+        }
+      }
+    });
+  }
 }
 
 const runServer = (rt: ActorRuntime): AsyncDisposable => {
@@ -47,13 +59,30 @@ const runServer = (rt: ActorRuntime): AsyncDisposable => {
   };
 };
 
-Deno.test("counter increment and getCount", async () => {
+Deno.test("counter tests", async () => {
   const rt = new ActorRuntime([Counter]);
   await using _server = runServer(rt);
   const actorId = "1234";
   const counterProxy = actors.proxy(Counter);
 
   const actor = counterProxy.id(actorId);
+  const name = `Counter Actor`;
+  const ch = actor.chan(name);
+  const it = ch.recv();
+  const { value, done } = await it.next();
+
+  assertFalse(done);
+  assertEquals(value, `Hello ${name}`);
+
+  await ch.send("PING");
+
+  const { value: pong, done: pongDone } = await it.next();
+
+  assertFalse(pongDone);
+  assertEquals(pong, "PONG");
+
+  await ch.close();
+
   const watcher = await actor.watch();
   // Test increment
   const number = await actor.increment();

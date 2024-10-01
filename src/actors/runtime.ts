@@ -1,5 +1,6 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
-import { ACTOR_ID_HEADER_NAME } from "./proxy.ts";
+import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
+import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "./proxy.ts";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
@@ -117,7 +118,8 @@ export class ActorRuntime {
    */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const actorId = req.headers.get(ACTOR_ID_HEADER_NAME);
+    const actorId = req.headers.get(ACTOR_ID_HEADER_NAME) ??
+      url.searchParams.get(ACTOR_ID_QS_NAME);
     if (!actorId) {
       return new Response(`missing ${ACTOR_ID_HEADER_NAME} header`, {
         status: 400,
@@ -147,6 +149,12 @@ export class ActorRuntime {
     if (req.headers.get("content-type")?.includes("application/json")) {
       const { args: margs } = await req.json();
       args = margs;
+    } else if (url.searchParams.get("args")) {
+      const qargs = url.searchParams.get("args");
+      const parsedArgs = qargs
+        ? JSON.parse(atob(decodeURIComponent(qargs)))
+        : {};
+      args = parsedArgs.args;
     }
     const methodImpl = actor[method as keyof typeof actor];
     if (!isInvocable(methodImpl)) {
@@ -161,6 +169,11 @@ export class ActorRuntime {
     const res = await (methodImpl as Function).bind(actor)(
       ...Array.isArray(args) ? args : [args],
     );
+    if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
+      const { socket, response } = Deno.upgradeWebSocket(req);
+      makeWebSocket(socket).then((ch) => res(ch)).finally(() => socket.close());
+      return response;
+    }
     if (isEventStreamResponse(res)) {
       req.signal.onabort = () => {
         res?.return?.();
