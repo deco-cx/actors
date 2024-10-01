@@ -1,8 +1,8 @@
 export interface ActorStorageListOptions {
-  start?: string;
-  startAfter?: string;
-  end?: string;
-  prefix?: string;
+  start?: string[];
+  startAfter?: string[];
+  end?: string[];
+  prefix?: string[];
   reverse?: boolean;
   limit?: number;
   noCache?: boolean;
@@ -24,23 +24,33 @@ export interface ActorStorage {
     options?: ActorStorageGetOptions,
   ): Promise<T>;
   get<T = unknown>(
-    keys: string[],
+    key: string[],
     options?: ActorStorageGetOptions,
-  ): Promise<Map<string, T>>;
+  ): Promise<T>;
+  get<T = unknown>(
+    keys: string[][],
+    options?: ActorStorageGetOptions,
+  ): Promise<[string[], T][]>;
   list<T = unknown>(
     options?: ActorStorageListOptions,
-  ): Promise<Map<string, T>>;
+  ): Promise<[string[], T][]>;
   put<T>(
     key: string,
     value: T,
     options?: ActorStoragePutOptions,
   ): Promise<void>;
   put<T>(
-    entries: Record<string, T>,
+    key: string[],
+    value: T,
     options?: ActorStoragePutOptions,
   ): Promise<void>;
-  delete(key: string, options?: ActorStoragePutOptions): Promise<boolean>;
-  delete(keys: string[], options?: ActorStoragePutOptions): Promise<number>;
+  put<T>(
+    entries: [string[], T][],
+    options?: ActorStoragePutOptions,
+  ): Promise<void>;
+  delete(key: string[], options?: ActorStoragePutOptions): Promise<boolean>;
+  delete(key: string[], options?: ActorStoragePutOptions): Promise<boolean>;
+  delete(keys: string[][], options?: ActorStoragePutOptions): Promise<number>;
   deleteAll(options?: ActorStoragePutOptions): Promise<void>;
   atomic(storage: (st: ActorStorage) => Promise<void>): Promise<void>;
 }

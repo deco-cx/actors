@@ -84,6 +84,9 @@ Deno.test("counter tests", async () => {
   await ch.close();
 
   const watcher = await actor.watch();
+
+  assertEquals(await actor.getCount(), 0);
+
   // Test increment
   const number = await actor.increment();
   assertEquals(number, 1);
