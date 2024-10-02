@@ -1,9 +1,9 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
-import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "./proxy.ts";
 import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
+import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 
 /**
  * Represents an actor.
@@ -136,7 +136,7 @@ export class ActorRuntime {
     const actorName = groups[ACTOR_NAME_PATH_PARAM];
     const actorInvoker = actorName ? this.actors.get(actorName) : undefined;
     if (!actorInvoker) {
-      return new Response(`actor ${ACTOR_NAME_PATH_PARAM} not found`, {
+      return new Response(`actor ${actorName} not found`, {
         status: 404,
       });
     }
