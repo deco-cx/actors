@@ -207,7 +207,6 @@ export class DenoKvActorStorage implements ActorStorage {
     );
 
     for await (const entry of iter) {
-      console.log(entry);
       result.push([(entry.key as string[]).slice(-2), entry.value]);
     }
 
