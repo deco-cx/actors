@@ -117,25 +117,6 @@ export const Alarms = {
 
     for await (const alarm of iter) yield alarm.value;
   },
-  async *watch() {
-    while (true) {
-      let foundAlarms = false;
-
-      // Fetch and yield alarms
-      for await (const alarm of Alarms.next()) {
-        foundAlarms = true;
-        yield alarm;
-      }
-
-      // Sleep until the next minute if no alarms were found
-      if (!foundAlarms) {
-        const now = new Date();
-        const msUntilNextMinute = 60 * 1000 -
-          (now.getSeconds() * 1000 + now.getMilliseconds());
-        await new Promise((resolve) => setTimeout(resolve, msUntilNextMinute));
-      }
-    }
-  },
 };
 
 const tryAck = async (alarm: Alarm): Promise<void> => {
