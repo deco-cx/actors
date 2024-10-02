@@ -76,11 +76,21 @@ export const Alarms = {
       versionstamp: awaited.versionstamp,
     };
   },
-  ack: async (alarm: Alarm): Promise<void> => {
-    await kv.atomic().delete([...ALARMS, alarm.id]).delete([
+  ack: async (
+    alarm: Alarm | Omit<CreateAlarmPayload, "triggerAt">,
+  ): Promise<void> => {
+    const id = Alarms.id(alarm);
+    const triggerAt = "triggerAt" in alarm
+      ? alarm.triggerAt
+      : (await Alarms.get(alarm)).value?.triggerAt;
+    if (!triggerAt) {
+      throw new Error(`alarm ${id} has no triggerAt`);
+    }
+
+    await kv.atomic().delete([...ALARMS, id]).delete([
       ...TRIGGERS,
-      alarm.triggerAt,
-      alarm.id,
+      triggerAt,
+      id,
     ]).commit();
   },
   retry: async (alarm: Alarm, reason: string): Promise<void> => {

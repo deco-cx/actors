@@ -21,8 +21,6 @@ ACTORS_DENO_KV_TOKEN &&
 
 export const kv = await Deno.openKv(ACTORS_KV_DATABASE);
 
-const ALARM_KEY = "alarm";
-
 interface AtomicOp {
   kv: Deno.AtomicOperation;
   dirty: Deno.KvEntryMaybe<unknown>[];
@@ -54,7 +52,10 @@ export class DenoKvActorStorage implements ActorStorage {
     ).then((alarm) => alarm.value?.triggerAt ?? null);
   }
   async deleteAlarm(): Promise<void> {
-    await this.delete(ALARM_KEY);
+    await Alarms.ack({
+      actorId: this.options.actorId,
+      actorName: this.options.actorName,
+    });
   }
 
   async atomic(_storage: (st: ActorStorage) => Promise<void>): Promise<void> {
