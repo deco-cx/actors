@@ -104,6 +104,10 @@ export class CachedStorage implements ActorStorage {
   }
 
   async delete(
+    key: string,
+    options?: ActorStoragePutOptions,
+  ): Promise<boolean>;
+  async delete(
     key: string[],
     options?: ActorStoragePutOptions,
   ): Promise<boolean>;

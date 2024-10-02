@@ -122,6 +122,7 @@ export class DenoKvActorStorage implements ActorStorage {
   }
 
   // Delete function that removes keys from Deno.Kv
+  async delete(key: string, options?: ActorStoragePutOptions): Promise<boolean>;
   async delete(
     key: string[],
     options?: ActorStoragePutOptions,

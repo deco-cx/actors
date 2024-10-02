@@ -48,6 +48,7 @@ export interface ActorStorage {
     entries: [string[], T][],
     options?: ActorStoragePutOptions,
   ): Promise<void>;
+  delete(key: string, options?: ActorStoragePutOptions): Promise<boolean>;
   delete(key: string[], options?: ActorStoragePutOptions): Promise<boolean>;
   delete(key: string[], options?: ActorStoragePutOptions): Promise<boolean>;
   delete(keys: string[][], options?: ActorStoragePutOptions): Promise<number>;
