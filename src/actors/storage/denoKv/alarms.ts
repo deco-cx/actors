@@ -148,4 +148,7 @@ export const triggerAlarms = async () => {
   }
   await Promise.all(Object.values(inflight));
 };
+// TODO (@author M. Candeia): this will make all isolates to spin up every 1 minute, would this be a problem?
+// Shouldn't instead have a single job that spin ups isolates if they need to be called instead?
+// On the other hand it is good because it works locally and remotelly in the same way.
 Deno.cron("schedulerD", "* * * * *", triggerAlarms);
