@@ -53,4 +53,7 @@ export interface ActorStorage {
   delete(keys: string[][], options?: ActorStoragePutOptions): Promise<number>;
   deleteAll(options?: ActorStoragePutOptions): Promise<void>;
   atomic(storage: (st: ActorStorage) => Promise<void>): Promise<void>;
+  setAlarm(dt: number): Promise<void>;
+  getAlarm(): Promise<number | null>;
+  deleteAlarm(): Promise<void>;
 }

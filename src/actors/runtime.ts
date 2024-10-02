@@ -1,7 +1,8 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
+import { DENO_ISOLATE_INSTANCE_ID } from "./env.ts";
 import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "./proxy.ts";
 import { ActorState } from "./state.ts";
-import { DenoKvActorStorage } from "./storage/denoKv.ts";
+import { DenoKvActorStorage } from "./storage/denoKv/storage.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 
@@ -119,7 +120,7 @@ export class ActorRuntime {
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const actorId = req.headers.get(ACTOR_ID_HEADER_NAME) ??
-      url.searchParams.get(ACTOR_ID_QS_NAME);
+      url.searchParams.get(ACTOR_ID_QS_NAME) ?? DENO_ISOLATE_INSTANCE_ID;
     if (!actorId) {
       return new Response(`missing ${ACTOR_ID_HEADER_NAME} header`, {
         status: 400,
