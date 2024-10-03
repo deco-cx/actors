@@ -4,6 +4,8 @@ import { ActorState } from "./state.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
+import { S3ActorStorage } from "./storage/s3.ts";
+import type { ActorStorage } from "./storage.ts";
 
 /**
  * Represents an actor.
@@ -81,6 +83,22 @@ export class ActorRuntime {
   ) {
   }
 
+  getActorStorage(actorId: string, actorName: string): ActorStorage {
+    const storage = Deno.env.get("DECO_ACTORS_STORAGE");
+
+    if (storage === "s3") {
+      return new S3ActorStorage({
+        actorId,
+        actorName,
+      });
+    }
+
+    return new DenoKvActorStorage({
+      actorId,
+      actorName,
+    });
+  }
+
   /**
    * Ensures that the actors are initialized for the given actor ID.
    * @param actorId - The ID of the actor.
@@ -91,10 +109,7 @@ export class ActorRuntime {
     }
     this.actorsConstructors.forEach((Actor) => {
       const initialization = Promise.withResolvers<void>();
-      const storage = new DenoKvActorStorage({
-        actorId,
-        actorName: Actor.name,
-      });
+      const storage = this.getActorStorage(actorId, Actor.name);
       const state = new ActorState({
         initialization,
         storage,
