@@ -17,7 +17,7 @@ export class S3ActorStorage implements ActorStorage {
   private region: string;
 
   constructor(protected options: StorageOptions) {
-    this.bucketName = Deno.env.get("S3_BUCKET_NAME")!;
+    this.bucketName = Deno.env.get("DECO_ACTORS_S3_BUCKET_NAME")!;
     this.accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID")!;
     this.secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY")!;
     this.region = Deno.env.get("AWS_REGION") ?? "us-east-1";
