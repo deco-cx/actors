@@ -129,6 +129,10 @@ export class S3ActorStorage implements ActorStorage {
 
   // Overloaded delete methods
   async delete(
+    key: string,
+    options?: ActorStoragePutOptions,
+  ): Promise<boolean>;
+  async delete(
     key: string[],
     options?: ActorStoragePutOptions,
   ): Promise<boolean>;
@@ -137,7 +141,7 @@ export class S3ActorStorage implements ActorStorage {
     options?: ActorStoragePutOptions,
   ): Promise<number>;
   async delete(
-    keyOrKeys: string[] | string[][],
+    keyOrKeys: string | string[] | string[][],
     _options?: ActorStoragePutOptions,
   ): Promise<boolean | number> {
     if (Array.isArray(keyOrKeys[0])) {
@@ -155,7 +159,9 @@ export class S3ActorStorage implements ActorStorage {
       return deletedCount;
     } else {
       // key: string[]
-      const keyParts = keyOrKeys as string[];
+      const keyParts = typeof keyOrKeys === "string"
+        ? [keyOrKeys]
+        : keyOrKeys as string[];
       const key = this.buildKey(keyParts);
       const response = await this.deleteObject(key);
       await response.body?.cancel();
