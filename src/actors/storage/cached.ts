@@ -5,16 +5,21 @@ import type {
   ActorStorageListOptions,
   ActorStoragePutOptions,
 } from "../storage.ts";
+import { RwLock } from "../util/rwlock.ts";
 
 export class CachedStorage implements ActorStorage {
-  protected cache: Map<string, any> = new Map<string, any>();
+  protected rwLock = new RwLock();
 
-  constructor(protected innerStorage: ActorStorage) {}
+  constructor(
+    protected innerStorage: ActorStorage,
+    protected cache = new Map<string, any>(),
+  ) {}
 
   private async getMany<T = unknown>(
     keys: string[][],
     options?: ActorStorageGetOptions,
   ): Promise<[string[], T][]> {
+    using _lock = await this.rwLock.rLock();
     const { noCache } = options || {};
     const result: [string[], T][] = [];
     const keysToFetch: string[][] = [];
@@ -63,6 +68,7 @@ export class CachedStorage implements ActorStorage {
   async list<T = unknown>(
     options?: ActorStorageListOptions,
   ): Promise<[string[], T][]> {
+    using _lock = await this.rwLock.rLock();
     const result = await this.innerStorage.list<T>(options);
 
     for (const [key, value] of result) {
@@ -82,6 +88,7 @@ export class CachedStorage implements ActorStorage {
     valueOrOptions?: T | ActorStoragePutOptions,
     options?: ActorStoragePutOptions,
   ): Promise<void> {
+    using _lock = await this.rwLock.lock();
     const entries: [string[], T][] = Array.isArray(keyOrEntries[0])
       ? keyOrEntries as [string[], T][]
       : [[
@@ -119,6 +126,7 @@ export class CachedStorage implements ActorStorage {
     keyOrKeys: string | string[] | string[][],
     options?: ActorStoragePutOptions,
   ): Promise<number | boolean> {
+    using _lock = await this.rwLock.lock();
     const keys = Array.isArray(keyOrKeys[0])
       ? keyOrKeys as string[][]
       : [typeof keyOrKeys === "string" ? [keyOrKeys] : keyOrKeys as string[]];
@@ -133,11 +141,15 @@ export class CachedStorage implements ActorStorage {
   }
 
   async deleteAll(options?: ActorStoragePutOptions): Promise<void> {
+    using _lock = await this.rwLock.lock();
     this.cache.clear();
     await this.innerStorage.deleteAll(options);
   }
 
   async atomic(storage: (st: ActorStorage) => Promise<void>): Promise<void> {
-    await storage(this);
+    using _lock = await this.rwLock.lock();
+    const clone = new Map(this.cache);
+    await storage(new CachedStorage(this, clone)); // snapshot isolation
+    this.cache = clone;
   }
 }
