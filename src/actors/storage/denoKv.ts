@@ -18,8 +18,21 @@ const ACTORS_DENO_KV_TOKEN = Deno.env.get("ACTORS_DENO_KV_TOKEN");
 ACTORS_DENO_KV_TOKEN &&
   Deno.env.set("DENO_KV_ACCESS_TOKEN", ACTORS_DENO_KV_TOKEN);
 
-const kv = await Deno.openKv(ACTORS_KV_DATABASE);
+let kv: Deno.Kv | null = null;
 
+try {
+  kv = await Deno.openKv(ACTORS_KV_DATABASE);
+} catch {
+  // ignore
+}
+function assertIsDefined<V>(
+  v: V | NonNullable<V>,
+): asserts v is NonNullable<V> {
+  const isDefined = v !== null && typeof v !== "undefined";
+  if (!isDefined) {
+    throw new Error(`Expected 'v' to be defined, but received ${v}`);
+  }
+}
 interface AtomicOp {
   kv: Deno.AtomicOperation;
   dirty: Deno.KvEntryMaybe<unknown>[];
@@ -31,6 +44,7 @@ export class DenoKvActorStorage implements ActorStorage {
   private kvOrTransaction: Deno.Kv | Deno.AtomicOperation;
 
   constructor(protected options: StorageOptions) {
+    assertIsDefined(kv);
     this.kv = kv;
     this.kvOrTransaction = options.atomicOp?.kv ?? kv;
     this.atomicOp = options.atomicOp;
