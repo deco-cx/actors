@@ -1,7 +1,6 @@
 import type { ActorStorage } from "./storage.ts";
 
 export interface ActorStateOptions {
-  initialization: PromiseWithResolvers<void>;
   storage: ActorStorage;
 }
 /**
@@ -9,13 +8,14 @@ export interface ActorStateOptions {
  */
 export class ActorState {
   public storage: ActorStorage;
+  public initialization: Promise<void> = Promise.resolve();
   constructor(private options: ActorStateOptions) {
     this.storage = options.storage;
   }
 
-  async blockConcurrencyWhile<T>(callback: () => Promise<T>): Promise<T> {
-    return await callback().finally(() => {
-      this.options.initialization.resolve();
-    });
+  blockConcurrencyWhile<T>(callback: () => Promise<T>): Promise<T> {
+    const result = callback();
+    this.initialization = result.then(() => {});
+    return result;
   }
 }

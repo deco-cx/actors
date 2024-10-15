@@ -1,11 +1,11 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
 import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "./proxy.ts";
 import { ActorState } from "./state.ts";
+import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
+import { S3ActorStorage } from "./storage/s3.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
-import { S3ActorStorage } from "./storage/s3.ts";
-import type { ActorStorage } from "./storage.ts";
 
 /**
  * Represents an actor.
@@ -65,7 +65,7 @@ export interface ActorInvoker {
   /**
    * A promise that resolves when the actor is initialized.
    */
-  initialization: PromiseWithResolvers<void>;
+  initialization: Promise<void>;
 }
 
 /**
@@ -108,10 +108,8 @@ export class ActorRuntime {
       return;
     }
     this.actorsConstructors.forEach((Actor) => {
-      const initialization = Promise.withResolvers<void>();
       const storage = this.getActorStorage(actorId, Actor.name);
       const state = new ActorState({
-        initialization,
         storage,
       });
       const actor = new Actor(
@@ -120,7 +118,7 @@ export class ActorRuntime {
       this.actors.set(Actor.name, {
         actor,
         state,
-        initialization,
+        initialization: state.initialization,
       });
     });
     this.initilized = true;
@@ -180,7 +178,7 @@ export class ActorRuntime {
         },
       );
     }
-    await initialization.promise;
+    await initialization;
     const res = await (methodImpl as Function).bind(actor)(
       ...Array.isArray(args) ? args : [args],
     );
