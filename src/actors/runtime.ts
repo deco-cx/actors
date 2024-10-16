@@ -1,5 +1,12 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
-import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "./proxy.ts";
+import { ActorError } from "./errors.ts";
+import {
+  ACTOR_ID_HEADER_NAME,
+  ACTOR_ID_QS_NAME,
+  type ActorInvoker,
+  create,
+  createHttpInvoker,
+} from "./proxyutil.ts";
 import { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
@@ -53,7 +60,7 @@ export type ActorConstructor<TInstance extends Actor = Actor> = new (
 /**
  * Represents an actor invoker.
  */
-export interface ActorInvoker {
+export interface ActorInstance {
   /**
    * The actor instance.
    */
@@ -72,8 +79,9 @@ export interface ActorInvoker {
  * Represents the runtime for managing and invoking actors.
  */
 export class ActorRuntime {
-  private actors: Map<string, ActorInvoker> = new Map<string, ActorInvoker>();
+  private actors: Map<string, ActorInstance> = new Map<string, ActorInstance>();
   private initilized = false;
+  private invoker: ActorInvoker;
   /**
    * Creates an instance of ActorRuntime.
    * @param actorsConstructors - An array of actor constructors.
@@ -81,6 +89,33 @@ export class ActorRuntime {
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
   ) {
+    const invoke: ActorInvoker["invoke"] = async (actorName, method, args) => {
+      const actorInvoker = actorName ? this.actors.get(actorName) : undefined;
+      if (!actorInvoker) {
+        throw new ActorError(`actor ${actorName} not found`, "NOT_FOUND");
+      }
+      const { actor, initialization } = actorInvoker;
+      if (!(method in actor)) {
+        throw new ActorError(
+          `actor ${actorName} not found`,
+          "METHOD_NOT_FOUND",
+        );
+      }
+      const methodImpl = actor[method as keyof typeof actor];
+      if (!isInvocable(methodImpl)) {
+        throw new ActorError(
+          `actor ${actorName} not found`,
+          "METHOD_NOT_INVOCABLE",
+        );
+      }
+      await initialization;
+      return await (methodImpl as Function).bind(actor)(
+        ...Array.isArray(args) ? args : [args],
+      );
+    };
+    this.invoker = {
+      invoke,
+    };
   }
 
   getActorStorage(actorId: string, actorName: string): ActorStorage {
@@ -110,7 +145,17 @@ export class ActorRuntime {
     this.actorsConstructors.forEach((Actor) => {
       const storage = this.getActorStorage(actorId, Actor.name);
       const state = new ActorState({
+        id: actorId,
         storage,
+        proxy: (actor) => {
+          const invoker = (id: string) => {
+            if (id === actorId) {
+              return this.invoker;
+            }
+            return createHttpInvoker(id);
+          };
+          return create(actor, invoker);
+        },
       });
       const actor = new Actor(
         state,
@@ -147,16 +192,12 @@ export class ActorRuntime {
     }
     const groups = result?.pathname.groups ?? {};
     const actorName = groups[ACTOR_NAME_PATH_PARAM];
-    const actorInvoker = actorName ? this.actors.get(actorName) : undefined;
-    if (!actorInvoker) {
-      return new Response(`actor ${actorName} not found`, {
-        status: 404,
-      });
-    }
-    const { actor, initialization } = actorInvoker;
     const method = groups[METHOD_NAME_PATH_PARAM];
-    if (!method || !(method in actor)) {
-      return new Response(`method not found for the actor`, { status: 404 });
+    if (!method || !actorName) {
+      return new Response(
+        `method ${method} not found for the actor ${actorName}`,
+        { status: 404 },
+      );
     }
     let args = [];
     if (req.headers.get("content-type")?.includes("application/json")) {
@@ -169,55 +210,58 @@ export class ActorRuntime {
         : {};
       args = parsedArgs.args;
     }
-    const methodImpl = actor[method as keyof typeof actor];
-    if (!isInvocable(methodImpl)) {
-      return new Response(
-        `cannot invoke actor method for type ${typeof methodImpl}`,
-        {
-          status: 400,
-        },
-      );
-    }
-    await initialization;
-    const res = await (methodImpl as Function).bind(actor)(
-      ...Array.isArray(args) ? args : [args],
-    );
-    if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
-      const { socket, response } = Deno.upgradeWebSocket(req);
-      makeWebSocket(socket).then((ch) => res(ch)).finally(() => socket.close());
-      return response;
-    }
-    if (isEventStreamResponse(res)) {
-      req.signal.onabort = () => {
-        res?.return?.();
-      };
+    try {
+      const res = await this.invoker.invoke(actorName, method, args);
+      if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
+        const { socket, response } = Deno.upgradeWebSocket(req);
+        makeWebSocket(socket).then((ch) => res(ch)).finally(() =>
+          socket.close()
+        );
+        return response;
+      }
+      if (isEventStreamResponse(res)) {
+        req.signal.onabort = () => {
+          res?.return?.();
+        };
 
-      return new Response(
-        new ReadableStream<ServerSentEventMessage>({
-          async pull(controller) {
-            for await (const content of res) {
-              controller.enqueue({
-                data: encodeURIComponent(JSON.stringify(content)),
-                id: Date.now(),
-                event: "message",
-              });
-            }
-            controller.close();
+        return new Response(
+          new ReadableStream<ServerSentEventMessage>({
+            async pull(controller) {
+              for await (const content of res) {
+                controller.enqueue({
+                  data: encodeURIComponent(JSON.stringify(content)),
+                  id: Date.now(),
+                  event: "message",
+                });
+              }
+              controller.close();
+            },
+            cancel() {
+              res?.return?.();
+            },
+          }).pipeThrough(new ServerSentEventStream()),
+          {
+            headers: {
+              "Content-Type": EVENT_STREAM_RESPONSE_HEADER,
+            },
           },
-          cancel() {
-            res?.return?.();
-          },
-        }).pipeThrough(new ServerSentEventStream()),
-        {
-          headers: {
-            "Content-Type": EVENT_STREAM_RESPONSE_HEADER,
-          },
-        },
-      );
+        );
+      }
+      if (typeof res === "undefined") {
+        return new Response(null, { status: 204 });
+      }
+      return Response.json(res);
+    } catch (err) {
+      if (err instanceof ActorError) {
+        return new Response(err.message, {
+          status: {
+            METHOD_NOT_FOUND: 404,
+            METHOD_NOT_INVOCABLE: 405,
+            NOT_FOUND: 404,
+          }[err.code] ?? 500,
+        });
+      }
+      throw err;
     }
-    if (typeof res === "undefined") {
-      return new Response(null, { status: 204 });
-    }
-    return Response.json(res);
   }
 }

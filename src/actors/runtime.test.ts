@@ -5,6 +5,11 @@ import type { ActorState } from "./state.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
+class Hello {
+  sayHello(): string {
+    return "Hello, World!";
+  }
+}
 class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();
@@ -14,6 +19,11 @@ class Counter {
     state.blockConcurrencyWhile(async () => {
       this.count = await this.state.storage.get<number>("counter") ?? 0;
     });
+  }
+
+  callSayHello(): Promise<string> {
+    const hello = this.state.proxy(Hello).id(this.state.id);
+    return hello.sayHello();
   }
 
   async increment(): Promise<number> {
@@ -50,8 +60,14 @@ class Counter {
   }
 }
 
-const runServer = (rt: ActorRuntime): AsyncDisposable => {
-  const server = Deno.serve(rt.fetch.bind(rt));
+const runServer = (
+  rt: ActorRuntime,
+  onReq?: (req: Request) => void,
+): AsyncDisposable => {
+  const server = Deno.serve((req) => {
+    onReq?.(req);
+    return rt.fetch(req);
+  });
   return {
     async [Symbol.asyncDispose]() {
       await server.shutdown();
@@ -60,8 +76,11 @@ const runServer = (rt: ActorRuntime): AsyncDisposable => {
 };
 
 Deno.test("counter tests", async () => {
-  const rt = new ActorRuntime([Counter]);
-  await using _server = runServer(rt);
+  const rt = new ActorRuntime([Counter, Hello]);
+  let reqCount = 0;
+  await using _server = runServer(rt, () => {
+    reqCount++;
+  });
   const actorId = "1234";
   const counterProxy = actors.proxy(Counter);
 
@@ -110,4 +129,8 @@ Deno.test("counter tests", async () => {
     assertEquals(done, false);
   }
   watcher.return?.();
+
+  const prevReqCount = reqCount;
+  assertEquals(await actor.callSayHello(), "Hello, World!");
+  assertEquals(reqCount, prevReqCount + 1); // does not need a new request for invoking another actor method
 });
