@@ -209,3 +209,27 @@ export const makeWebSocket = <
   };
   return ch.promise;
 };
+
+export const makeDuplexChannel = async <TSend, TReceive>(
+  upgrader?: ChannelUpgrader<TSend, TReceive>,
+): Promise<DuplexChannel<TSend, TReceive>> => {
+  // Create internal send and receive channels
+  const sendChan = makeChan<TSend>();
+  const recvChan = makeChan<TReceive>();
+
+  const duplexChannel: DuplexChannel<TSend, TReceive> = {
+    send: sendChan.send.bind(sendChan),
+    recv: recvChan.recv.bind(recvChan),
+    close: () => {
+      sendChan.close();
+      recvChan.close();
+    },
+  };
+
+  // If there's an upgrader, we upgrade the duplex channel
+  if (upgrader && isUpgrade(upgrader)) {
+    await upgrader(duplexChannel);
+  }
+
+  return duplexChannel;
+};
