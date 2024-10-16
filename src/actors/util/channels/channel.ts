@@ -211,6 +211,11 @@ export const makeWebSocket = <
   return ch.promise;
 };
 
+/**
+ * Creates a new duplex channel.
+ * @param upgrader the channel upgrader
+ * @returns a created duplex channel
+ */
 export const makeDuplexChannel = <TSend, TReceive>(
   upgrader?: ChannelUpgrader<TSend, TReceive>,
 ): DuplexChannel<TSend, TReceive> => {
