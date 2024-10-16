@@ -4,7 +4,9 @@ import {
   ACTOR_ID_HEADER_NAME,
   ACTOR_ID_QS_NAME,
   type ActorInvoker,
-} from "./proxy.ts";
+  create,
+  createHttpInvoker,
+} from "./proxyutil.ts";
 import { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
@@ -113,7 +115,6 @@ export class ActorRuntime {
     };
     this.invoker = {
       invoke,
-      connect: invoke,
     };
   }
 
@@ -144,7 +145,17 @@ export class ActorRuntime {
     this.actorsConstructors.forEach((Actor) => {
       const storage = this.getActorStorage(actorId, Actor.name);
       const state = new ActorState({
+        id: actorId,
         storage,
+        proxy: (actor) => {
+          const invoker = (id: string) => {
+            if (id === actorId) {
+              return this.invoker;
+            }
+            return createHttpInvoker(id);
+          };
+          return create(actor, invoker);
+        },
       });
       const actor = new Actor(
         state,
