@@ -9,6 +9,14 @@ class Hello {
   sayHello(): string {
     return "Hello, World!";
   }
+
+  chan(name: string): ChannelUpgrader<string, string> {
+    return (async ({ send }) => {
+      for (let i = 0; i < 10; i++) {
+        await send(`Hello ${name} ${i}`);
+      }
+    });
+  }
 }
 class Counter {
   private count: number;
@@ -46,6 +54,14 @@ class Counter {
 
   watch(): AsyncIterableIterator<number> {
     return this.watchTarget.subscribe();
+  }
+
+  async *readHelloChan(name: string): AsyncIterableIterator<string> {
+    const hello = this.state.proxy(Hello).id(this.state.id);
+    using helloChan = hello.chan(name);
+    for await (const event of helloChan.recv()) {
+      yield event;
+    }
   }
 
   chan(name: string): ChannelUpgrader<string, string> {
@@ -133,4 +149,13 @@ Deno.test("counter tests", async () => {
   const prevReqCount = reqCount;
   assertEquals(await actor.callSayHello(), "Hello, World!");
   assertEquals(reqCount, prevReqCount + 1); // does not need a new request for invoking another actor method
+
+  const prevReqCountHello = reqCount;
+  const helloChan = await actor.readHelloChan(name);
+  for (let i = 0; i < 10; i++) {
+    const { value } = await helloChan.next();
+    assertEquals(`Hello ${name} ${i}`, value);
+  }
+  helloChan.return?.();
+  assertEquals(reqCount, prevReqCountHello + 1); // does not need a new request for invoking another actor method
 });

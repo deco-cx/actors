@@ -129,7 +129,7 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
   };
 };
 
-export interface DuplexChannel<TSend, TReceive> {
+export interface DuplexChannel<TSend, TReceive> extends Disposable {
   send: Channel<TSend>["send"];
   recv: Channel<TReceive>["recv"];
   close: () => void | Promise<void>;
@@ -195,6 +195,7 @@ export const makeWebSocket = <
       recv: recvChan.recv.bind(recvChan),
       send: sendChan.send.bind(recvChan),
       close: () => socket.close(),
+      [Symbol.dispose]: () => socket.close(),
     });
     for await (const message of sendChan.recv()) {
       try {
@@ -208,4 +209,42 @@ export const makeWebSocket = <
     socket.close();
   };
   return ch.promise;
+};
+
+/**
+ * Creates a new duplex channel.
+ * @param upgrader the channel upgrader
+ * @returns a created duplex channel
+ */
+export const makeDuplexChannel = <TSend, TReceive>(
+  upgrader?: ChannelUpgrader<TSend, TReceive>,
+): DuplexChannel<TSend, TReceive> => {
+  // Create internal send and receive channels
+  const sendChan = makeChan<TSend>();
+  const recvChan = makeChan<TReceive>();
+
+  const duplexChannel: DuplexChannel<TSend, TReceive> = {
+    send: sendChan.send.bind(sendChan),
+    recv: recvChan.recv.bind(recvChan),
+    close: () => {
+      sendChan.close();
+      recvChan.close();
+    },
+    [Symbol.dispose]: () => {
+      sendChan.close();
+      recvChan.close();
+    },
+  };
+
+  // If there's an upgrader, we upgrade the duplex channel
+  if (upgrader && isUpgrade(upgrader)) {
+    upgrader({
+      send: recvChan.send.bind(recvChan),
+      recv: sendChan.recv.bind(sendChan),
+      close: duplexChannel.close,
+      [Symbol.dispose]: duplexChannel[Symbol.dispose],
+    });
+  }
+
+  return duplexChannel;
 };

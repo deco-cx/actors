@@ -12,7 +12,11 @@ import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { S3ActorStorage } from "./storage/s3.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
-import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
+import {
+  isUpgrade,
+  makeDuplexChannel,
+  makeWebSocket,
+} from "./util/channels/channel.ts";
 
 /**
  * Represents an actor.
@@ -150,7 +154,20 @@ export class ActorRuntime {
         proxy: (actor) => {
           const invoker = (id: string) => {
             if (id === actorId) {
-              return this.invoker;
+              return {
+                invoke: async (
+                  name: string,
+                  method: string,
+                  args: unknown[],
+                  connect?: true,
+                ) => {
+                  const resp = await this.invoker.invoke(name, method, args);
+                  if (connect && isUpgrade(resp)) {
+                    return makeDuplexChannel(resp);
+                  }
+                  return resp;
+                },
+              };
             }
             return createHttpInvoker(id);
           };

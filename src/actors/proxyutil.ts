@@ -57,6 +57,9 @@ export class ActorAwaiter<
     protected invoker: ActorInvoker<TResponse, TChannel>,
   ) {
   }
+  [Symbol.dispose](): void {
+    this.close();
+  }
   async close() {
     const ch = await this.channel;
     await ch.close();
