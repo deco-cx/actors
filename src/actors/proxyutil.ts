@@ -8,7 +8,7 @@ import {
 } from "./util/channels/channel.ts";
 
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
-export const ACTOR_ID_QS_NAME = "x-deno-isolate-instance-id";
+export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
 /**
  * Promise.prototype.then onfufilled callback type.
  */
