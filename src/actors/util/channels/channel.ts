@@ -140,7 +140,7 @@ export interface DuplexChannel<TSend, TReceive> extends Disposable {
  */
 export type ChannelUpgrader<TSend, TReceive = TSend> = (
   ch: DuplexChannel<TSend, TReceive>,
-) => Promise<void>;
+) => Promise<void> | void;
 
 // deno-lint-ignore no-explicit-any
 export type Message<TMessageProperties = any> = TMessageProperties & {
