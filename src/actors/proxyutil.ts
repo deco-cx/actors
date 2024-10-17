@@ -121,7 +121,7 @@ export interface ProxyOptions<TInstance extends Actor> {
 export type PromisifyKey<key extends keyof Actor, Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
-    ? (...args: Args) => DuplexChannel<TSend, TReceive>
+    ? (...args: Args) => DuplexChannel<TReceive, TSend>
   : (...args: Args) => Promise<Return>
   : Actor[key];
 
