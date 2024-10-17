@@ -135,6 +135,9 @@ export interface DuplexChannel<TSend, TReceive> extends Disposable {
   close: () => void | Promise<void>;
 }
 
+/**
+ * A function that upgrades a channel.
+ */
 export type ChannelUpgrader<TSend, TReceive = TSend> = (
   ch: DuplexChannel<TSend, TReceive>,
 ) => Promise<void>;
