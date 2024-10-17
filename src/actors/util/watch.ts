@@ -1,4 +1,4 @@
-export type { ChannelUpgrader } from ".//channels/channel.ts";
+export type { ChannelUpgrader } from "./channels/channel.ts";
 /**
  * Watches events and returns async iterators for the events.
  */
