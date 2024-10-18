@@ -6,7 +6,7 @@ export class WatchTarget<T> {
   private subscribers: Record<string, (value: T) => void> = {};
 
   // Subscribe to changes and get an async iterator
-  subscribe(): AsyncIterableIterator<T> {
+  subscribe(signal?: AbortSignal): AsyncIterableIterator<T> {
     const subscriptionId = crypto.randomUUID();
     const queue: Array<(value: IteratorResult<T>) => void> = [];
 
@@ -16,7 +16,12 @@ export class WatchTarget<T> {
 
     const nextPromise = () =>
       new Promise<IteratorResult<T>>((resolve) => {
-        queue.push(resolve);
+        queue.push((v) => {
+          if (signal?.aborted) {
+            return resolve({ value: undefined, done: true });
+          }
+          resolve(v);
+        });
       });
 
     const iterator: AsyncIterableIterator<T> = {
@@ -34,6 +39,9 @@ export class WatchTarget<T> {
     this.subscribers[subscriptionId] = (value: T) => {
       pushQueue({ value, done: false });
     };
+    signal?.addEventListener("abort", () => {
+      iterator?.return?.();
+    });
 
     return iterator;
   }
