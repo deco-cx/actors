@@ -133,6 +133,8 @@ export interface DuplexChannel<TSend, TReceive> extends Disposable {
   send: Channel<TSend>["send"];
   recv: Channel<TReceive>["recv"];
   close: () => void | Promise<void>;
+  closed: Promise<void>;
+  signal: AbortSignal;
 }
 
 /**
@@ -195,6 +197,8 @@ export const makeWebSocket = <
   };
   socket.onopen = async () => {
     ch.resolve({
+      closed: Promise.race([recvChan.closed, sendChan.closed]),
+      signal: link(recvChan.signal, sendChan.signal),
       recv: recvChan.recv.bind(recvChan),
       send: sendChan.send.bind(recvChan),
       close: () => socket.close(),
@@ -227,6 +231,8 @@ export const makeDuplexChannel = <TSend, TReceive>(
   const recvChan = makeChan<TReceive>();
 
   const duplexChannel: DuplexChannel<TSend, TReceive> = {
+    closed: Promise.race([recvChan.closed, sendChan.closed]),
+    signal: link(sendChan.signal, recvChan.signal),
     send: sendChan.send.bind(sendChan),
     recv: recvChan.recv.bind(recvChan),
     close: () => {
@@ -242,6 +248,8 @@ export const makeDuplexChannel = <TSend, TReceive>(
   // If there's an upgrader, we upgrade the duplex channel
   if (upgrader && isUpgrade(upgrader)) {
     upgrader({
+      closed: duplexChannel.closed,
+      signal: duplexChannel.signal,
       send: recvChan.send.bind(recvChan),
       recv: sendChan.recv.bind(sendChan),
       close: duplexChannel.close,

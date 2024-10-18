@@ -64,6 +64,12 @@ export class ActorAwaiter<
     const ch = await this.channel;
     await ch.close();
   }
+  get signal() {
+    return new AbortSignal();
+  }
+  get closed() {
+    return this.channel.then((ch) => ch.closed);
+  }
 
   async *recv(signal?: AbortSignal): AsyncIterableIterator<unknown> {
     const ch = await this.channel;
