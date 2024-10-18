@@ -206,7 +206,7 @@ export const makeWebSocket = <
           serializer.serialize(message),
         );
       } catch (_err) {
-        console.error("error sending message through socket", message);
+        console.error("error sending message through socket", _err, message);
       }
     }
     socket.close();
