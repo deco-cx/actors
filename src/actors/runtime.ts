@@ -274,7 +274,7 @@ export class ActorRuntime {
           },
         );
       }
-      if (typeof res === "undefined") {
+      if (typeof res === "undefined" || res === null) {
         return new Response(null, { status: 204 });
       }
       if (res instanceof Uint8Array) {
