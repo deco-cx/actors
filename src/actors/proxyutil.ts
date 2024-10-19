@@ -211,9 +211,13 @@ export const createHttpInvoker = <
               ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
               : {},
           },
-          body: JSON.stringify({
-            args: methodArgs ?? [],
-          }),
+          body: JSON.stringify(
+            {
+              args: methodArgs ?? [],
+            },
+            (_key, value) =>
+              typeof value === "bigint" ? value.toString() : value, // return everything else unchanged
+          ),
         },
       );
       if (!resp.ok) {
