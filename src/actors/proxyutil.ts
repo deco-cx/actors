@@ -217,6 +217,9 @@ export const createHttpInvoker = <
         },
       );
       if (!resp.ok) {
+        if (resp.status === 404) {
+          return undefined;
+        }
         const constructorName = resp.headers.get(ACTOR_CONSTRUCTOR_NAME_HEADER);
         const ErrorConstructor =
           options?.errorHandling?.[constructorName ?? "Error"] ?? Error;

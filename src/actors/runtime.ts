@@ -80,6 +80,10 @@ export interface ActorInstance {
   initialization: Promise<void>;
 }
 
+const KNOWN_METHODS: Record<string, symbol> = {
+  "Symbol(Symbol.asyncDispose)": Symbol.asyncDispose,
+  "Symbol(Symbol.dispose)": Symbol.dispose,
+};
 /**
  * Represents the runtime for managing and invoking actors.
  */
@@ -94,12 +98,17 @@ export class ActorRuntime {
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
   ) {
-    const invoke: ActorInvoker["invoke"] = async (actorName, method, args) => {
+    const invoke: ActorInvoker["invoke"] = async (
+      actorName,
+      methodName,
+      args,
+    ) => {
       const actorInvoker = actorName ? this.actors.get(actorName) : undefined;
       if (!actorInvoker) {
         throw new ActorError(`actor ${actorName} not found`, "NOT_FOUND");
       }
       const { actor, initialization } = actorInvoker;
+      const method = KNOWN_METHODS[methodName] ?? methodName;
       if (!(method in actor)) {
         throw new ActorError(
           `actor ${actorName} not found`,
