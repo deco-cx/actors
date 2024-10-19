@@ -1,4 +1,4 @@
-import type { ActorsServer } from "./proxy.ts";
+import type { ActorsOptions, ActorsServer } from "./proxy.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
 import {
@@ -9,6 +9,7 @@ import {
 
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
+export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
 /**
  * Promise.prototype.then onfufilled callback type.
  */
@@ -177,8 +178,9 @@ export const createHttpInvoker = <
   TChannel extends DuplexChannel<unknown, unknown>,
 >(
   actorId: string,
-  server?: ActorsServer,
+  options?: ActorsOptions,
 ): ActorInvoker<TResponse, TChannel> => {
+  const server = options?.server;
   if (!server) {
     _server ??= initServer();
   }
@@ -214,6 +216,24 @@ export const createHttpInvoker = <
           }),
         },
       );
+      if (!resp.ok) {
+        const constructorName = resp.headers.get(ACTOR_CONSTRUCTOR_NAME_HEADER);
+        const ErrorConstructor =
+          options?.errorHandling?.[constructorName ?? "Error"] ?? Error;
+        const errorParameters =
+          resp.headers.get("content-type")?.includes("application/json")
+            ? await resp.json()
+            : {
+              message: await resp.text().catch(() =>
+                `HTTP Error: ${resp.statusText}`
+              ),
+            };
+        const deserializedError = Object.assign(
+          new ErrorConstructor(),
+          errorParameters,
+        );
+        throw deserializedError;
+      }
       if (
         resp.headers.get("content-type") ===
           EVENT_STREAM_RESPONSE_HEADER

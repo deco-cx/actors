@@ -1,6 +1,7 @@
 import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
 import { ActorError } from "./errors.ts";
 import {
+  ACTOR_CONSTRUCTOR_NAME_HEADER,
   ACTOR_ID_HEADER_NAME,
   ACTOR_ID_QS_NAME,
   type ActorInvoker,
@@ -276,6 +277,20 @@ export class ActorRuntime {
             METHOD_NOT_INVOCABLE: 405,
             NOT_FOUND: 404,
           }[err.code] ?? 500,
+        });
+      }
+      const constructorName = err?.constructor?.name;
+      if (constructorName) {
+        const serializedError = JSON.stringify(
+          err,
+          Object.getOwnPropertyNames(err),
+        );
+        return new Response(serializedError, {
+          status: 500,
+          headers: {
+            [ACTOR_CONSTRUCTOR_NAME_HEADER]: constructorName,
+            "content-type": "application/json",
+          },
         });
       }
       throw err;
