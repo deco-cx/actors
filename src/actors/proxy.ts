@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import { create, createHttpInvoker, type Promisify } from "./proxyutil.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
 
@@ -8,7 +9,7 @@ export interface ActorsServer {
 
 export interface ActorsOptions {
   server?: ActorsServer;
-  errorHandling?: Record<string, new (...args: unknown[]) => Error>;
+  errorHandling?: Record<string, new (...args: any[]) => Error>;
 }
 /**
  * utilities to create and manage actors.
