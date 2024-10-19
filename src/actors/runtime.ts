@@ -277,6 +277,15 @@ export class ActorRuntime {
       if (typeof res === "undefined") {
         return new Response(null, { status: 204 });
       }
+      if (res instanceof Uint8Array) {
+        return new Response(res, {
+          headers: {
+            "content-type": "application/octet-stream",
+            "content-length": `${res.length}`,
+          },
+          status: 200,
+        });
+      }
       return Response.json(res);
     } catch (err) {
       if (err instanceof ActorError) {

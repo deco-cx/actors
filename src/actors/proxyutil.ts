@@ -256,6 +256,11 @@ export const createHttpInvoker = <
       if (resp.status === 204) {
         return;
       }
+      if (
+        resp.headers.get("content-type")?.includes("application/octet-stream")
+      ) {
+        return new Uint8Array(await resp.arrayBuffer());
+      }
       return resp.json();
     },
   };
