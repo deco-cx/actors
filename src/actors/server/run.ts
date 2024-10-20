@@ -11,7 +11,10 @@ if (import.meta.main) {
 
   // dynamically import all actors in the actors folder.
   for await (const dirEntry of Deno.readDir(actorsFolder)) {
-    if (dirEntry.isFile && dirEntry.name.endsWith(".ts")) {
+    if (
+      dirEntry.isFile && dirEntry.name.endsWith(".ts") ||
+      dirEntry.name.endsWith(".tsx")
+    ) {
       const actor = await import(join(actorsFolder, dirEntry.name));
       if (actor.default) {
         actors.push(actor.default);
