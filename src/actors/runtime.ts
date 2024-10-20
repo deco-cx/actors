@@ -102,6 +102,7 @@ export class ActorRuntime {
       actorName,
       methodName,
       args,
+      metadata,
     ) => {
       const actorInvoker = actorName ? this.actors.get(actorName) : undefined;
       if (!actorInvoker) {
@@ -123,7 +124,16 @@ export class ActorRuntime {
         );
       }
       await initialization;
-      return await (methodImpl as Function).bind(actor)(
+      // Create a proxy to override the 'name' property for this specific bind
+      const actorProxy = new Proxy(actor, {
+        get(target, prop, receiver) {
+          if (prop === "metadata") {
+            return metadata; // Only modify this property for the proxy
+          }
+          return Reflect.get(target, prop, receiver); // Default behavior for other properties
+        },
+      });
+      return await (methodImpl as Function).bind(actorProxy)(
         ...Array.isArray(args) ? args : [args],
       );
     };
@@ -169,9 +179,15 @@ export class ActorRuntime {
                   name: string,
                   method: string,
                   args: unknown[],
+                  metadata: unknown,
                   connect?: true,
                 ) => {
-                  const resp = await this.invoker.invoke(name, method, args);
+                  const resp = await this.invoker.invoke(
+                    name,
+                    method,
+                    args,
+                    metadata,
+                  );
                   if (connect && isUpgrade(resp)) {
                     return makeDuplexChannel(resp);
                   }
@@ -231,19 +247,22 @@ export class ActorRuntime {
         { status: 404 },
       );
     }
-    let args = [];
+    let args = [], metadata = {};
     if (req.headers.get("content-type")?.includes("application/json")) {
-      const { args: margs } = await req.json();
+      const { args: margs, metadata: maybeMetadata } = await req.json();
       args = margs;
+      metadata = maybeMetadata;
     } else if (url.searchParams.get("args")) {
       const qargs = url.searchParams.get("args");
+
       const parsedArgs = qargs
         ? JSON.parse(atob(decodeURIComponent(qargs)))
         : {};
       args = parsedArgs.args;
+      metadata = parsedArgs.metadata;
     }
     try {
-      const res = await this.invoker.invoke(actorName, method, args);
+      const res = await this.invoker.invoke(actorName, method, args, metadata);
       if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
         const { socket, response } = Deno.upgradeWebSocket(req);
         makeWebSocket(socket).then((ch) => res(ch)).finally(() =>
