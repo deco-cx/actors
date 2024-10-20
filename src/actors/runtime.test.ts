@@ -21,6 +21,7 @@ class Hello {
 class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();
+  public metadata?: { extraSum: number };
 
   constructor(protected state: ActorState) {
     this.count = 0;
@@ -49,7 +50,7 @@ class Counter {
   }
 
   getCount(): number {
-    return this.count;
+    return this.count + (this.metadata?.extraSum ?? 0);
   }
 
   watch(): AsyncIterableIterator<number> {
@@ -120,7 +121,7 @@ Deno.test("counter tests", async () => {
 
   const watcher = await actor.watch();
 
-  assertEquals(await actor.getCount(), 0);
+  assertEquals(await actor.withMetadata({ extraSum: 10 }).getCount(), 10);
 
   // Test increment
   const number = await actor.increment();

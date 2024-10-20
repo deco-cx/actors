@@ -33,12 +33,14 @@ export interface ActorInvoker<
     name: string,
     method: string,
     methodArgs: unknown[],
+    metadata?: unknown,
   ): Promise<TResponse>;
 
   invoke(
     name: string,
     method: string,
     methodArgs: unknown[],
+    metadata: unknown,
     connect: true,
   ): Promise<TChannel>;
 }
@@ -56,6 +58,7 @@ export class ActorAwaiter<
     protected actorMethod: string,
     protected methodArgs: unknown[],
     protected invoker: ActorInvoker<TResponse, TChannel>,
+    protected mMetadata?: unknown,
   ) {
   }
   [Symbol.dispose](): void {
@@ -82,6 +85,7 @@ export class ActorAwaiter<
       this.actorName,
       this.actorMethod,
       this.methodArgs,
+      this.mMetadata,
       true,
     );
   }
@@ -96,6 +100,7 @@ export class ActorAwaiter<
       this.actorName,
       this.actorMethod,
       this.methodArgs,
+      this.mMetadata,
     )
       .catch(onrejected);
   }
@@ -111,6 +116,7 @@ export class ActorAwaiter<
       this.actorName,
       this.actorMethod,
       this.methodArgs,
+      this.mMetadata,
     ).then(onfufilled).catch(
       onrejected,
     );
@@ -128,13 +134,19 @@ export interface ProxyOptions<TInstance extends Actor> {
 export type PromisifyKey<key extends keyof Actor, Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
-    ? (...args: Args) => DuplexChannel<TReceive, TSend>
-  : (...args: Args) => Promise<Return>
+    ? { (...args: Args): DuplexChannel<TReceive, TSend> }
+  : { (...args: Args): Promise<Return> }
   : Actor[key];
 
-export type Promisify<Actor> = {
-  [key in keyof Actor]: PromisifyKey<key, Actor>;
-};
+export type Promisify<Actor> =
+  & {
+    [key in keyof Actor]: PromisifyKey<key, Actor>;
+  }
+  & (Actor extends { metadata?: infer TMetadata } ? {
+      withMetadata(metadata: TMetadata): Promisify<Actor>;
+    }
+    // deno-lint-ignore ban-types
+    : {});
 
 const urlFor = (
   serverUrl: string,
@@ -186,13 +198,18 @@ export const createHttpInvoker = <
   }
   const actorsServer = server ?? _server!;
   return {
-    invoke: async (name, method, methodArgs, connect?: true) => {
+    invoke: async (name, method, methodArgs, metadata, connect?: true) => {
       const endpoint = urlFor(actorsServer.url, name, method);
       if (connect) {
         const ws = new WebSocket(
           `${endpoint}?args=${
             encodeURIComponent(
-              btoa(JSON.stringify({ args: methodArgs ?? [] })),
+              btoa(
+                JSON.stringify({
+                  args: methodArgs ?? [],
+                  metadata: metadata ?? {},
+                }),
+              ),
             )
           }&${ACTOR_ID_QS_NAME}=${actorId}`,
         );
@@ -214,6 +231,7 @@ export const createHttpInvoker = <
           body: JSON.stringify(
             {
               args: methodArgs ?? [],
+              metadata: metadata ?? {},
             },
             (_key, value) =>
               typeof value === "bigint" ? value.toString() : value, // return everything else unchanged
@@ -269,12 +287,16 @@ export const createHttpInvoker = <
 export const create = <TInstance extends Actor>(
   actor: ActorConstructor<TInstance> | string,
   invokerFactory: (id: string) => ActorInvoker,
+  metadata?: unknown,
 ): { id: (id: string) => Promisify<TInstance> } => {
   const name = typeof actor === "string" ? actor : actor.name;
   return {
     id: (id: string): Promisify<TInstance> => {
       return new Proxy<Promisify<TInstance>>({} as Promisify<TInstance>, {
         get: (_, method) => {
+          if (method === "withMetadata") {
+            return (m: unknown) => create(actor, invokerFactory, m).id(id);
+          }
           const invoker = invokerFactory(id);
           return (...args: unknown[]) => {
             const awaiter = new ActorAwaiter(
@@ -282,6 +304,7 @@ export const create = <TInstance extends Actor>(
               String(method),
               args,
               invoker,
+              metadata,
             );
             return awaiter;
           };
