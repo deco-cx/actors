@@ -196,6 +196,11 @@ export class ActorRuntime {
     this.initilized = true;
   }
 
+  // some apis use handler (like deno.serve)
+  handler(req: Request): Promise<Response> {
+    return this.fetch(req);
+  }
+
   /**
    * Handles an incoming request and invokes the corresponding actor method.
    * @param req - The incoming request.
