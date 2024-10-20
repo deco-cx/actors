@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-import { create, createHttpInvoker, type ActorProxy } from "./proxyutil.ts";
+import { type ActorProxy, create, createHttpInvoker } from "./proxyutil.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
-
+export type { ActorProxy };
 export interface ActorsServer {
   url: string;
   deploymentId?: string;
