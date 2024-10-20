@@ -131,7 +131,7 @@ export interface ProxyOptions<TInstance extends Actor> {
   server: string;
 }
 
-export type PromisifyKey<key extends keyof Actor, Actor> = Actor[key] extends
+export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
     ? { (...args: Args): DuplexChannel<TReceive, TSend> }
@@ -143,7 +143,7 @@ export type PromisifyKey<key extends keyof Actor, Actor> = Actor[key] extends
  */
 export type ActorProxy<Actor> =
   & {
-    [key in keyof Actor]: PromisifyKey<key, Actor>;
+    [key in keyof Actor]: PromisifyKey<Actor, key>;
   }
   & (Actor extends { metadata?: infer TMetadata } ? {
       withMetadata(metadata: TMetadata): ActorProxy<Actor>;
