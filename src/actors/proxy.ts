@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { create, createHttpInvoker, type Promisify } from "./proxyutil.ts";
+import { create, createHttpInvoker, type ActorProxy } from "./proxyutil.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
 
 export interface ActorsServer {
@@ -18,7 +18,7 @@ export const actors = {
   proxy: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance> | string,
     options?: ActorsOptions | undefined,
-  ): { id: (id: string) => Promisify<TInstance> } => {
+  ): { id: (id: string) => ActorProxy<TInstance> } => {
     const factory = (id: string) => createHttpInvoker(id, options);
     return create(actor, factory);
   },

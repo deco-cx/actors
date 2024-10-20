@@ -138,12 +138,15 @@ export type PromisifyKey<key extends keyof Actor, Actor> = Actor[key] extends
   : { (...args: Args): Promise<Return> }
   : Actor[key];
 
-export type Promisify<Actor> =
+/**
+ * Represents an actor proxy.
+ */
+export type ActorProxy<Actor> =
   & {
     [key in keyof Actor]: PromisifyKey<key, Actor>;
   }
   & (Actor extends { metadata?: infer TMetadata } ? {
-      withMetadata(metadata: TMetadata): Promisify<Actor>;
+      withMetadata(metadata: TMetadata): ActorProxy<Actor>;
     }
     // deno-lint-ignore ban-types
     : {});
@@ -288,11 +291,11 @@ export const create = <TInstance extends Actor>(
   actor: ActorConstructor<TInstance> | string,
   invokerFactory: (id: string) => ActorInvoker,
   metadata?: unknown,
-): { id: (id: string) => Promisify<TInstance> } => {
+): { id: (id: string) => ActorProxy<TInstance> } => {
   const name = typeof actor === "string" ? actor : actor.name;
   return {
-    id: (id: string): Promisify<TInstance> => {
-      return new Proxy<Promisify<TInstance>>({} as Promisify<TInstance>, {
+    id: (id: string): ActorProxy<TInstance> => {
+      return new Proxy<ActorProxy<TInstance>>({} as ActorProxy<TInstance>, {
         get: (_, method) => {
           if (method === "withMetadata") {
             return (m: unknown) => create(actor, invokerFactory, m).id(id);
