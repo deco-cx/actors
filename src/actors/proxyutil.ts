@@ -135,7 +135,7 @@ export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
     ? { (...args: Args): DuplexChannel<TReceive, TSend> }
-  : { (...args: Args): Promise<Return> }
+  : { (...args: Args): Promise<Awaited<Return>> }
   : Actor[key];
 
 /**
