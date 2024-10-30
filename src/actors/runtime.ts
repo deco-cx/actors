@@ -1,4 +1,4 @@
-import { type ServerSentEventMessage, ServerSentEventStream } from "@std/http";
+import process from "node:process";
 import { ActorError } from "./errors.ts";
 import {
   ACTOR_CONSTRUCTOR_NAME_HEADER,
@@ -18,6 +18,10 @@ import {
   makeDuplexChannel,
   makeWebSocket,
 } from "./util/channels/channel.ts";
+import {
+  type ServerSentEventMessage,
+  ServerSentEventStream,
+} from "./util/sse.ts";
 
 /**
  * Represents an actor.
@@ -143,7 +147,7 @@ export class ActorRuntime {
   }
 
   getActorStorage(actorId: string, actorName: string): ActorStorage {
-    const storage = Deno.env.get("DECO_ACTORS_STORAGE");
+    const storage = process.env.DECO_ACTORS_STORAGE;
 
     if (storage === "s3") {
       return new S3ActorStorage({
@@ -264,7 +268,7 @@ export class ActorRuntime {
     try {
       const res = await this.invoker.invoke(actorName, method, args, metadata);
       if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
-        const { socket, response } = Deno.upgradeWebSocket(req);
+        const { socket, response } = Deno?.upgradeWebSocket(req);
         makeWebSocket(socket).then((ch) => res(ch)).finally(() =>
           socket.close()
         );

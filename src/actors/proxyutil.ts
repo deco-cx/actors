@@ -1,3 +1,4 @@
+import process from "node:process";
 import type { ActorsOptions, ActorsServer } from "./proxy.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
@@ -172,15 +173,13 @@ const initServer = (): ActorsServer => {
     };
   }
 
-  const deploymentId = Deno.env.get("DENO_DEPLOYMENT_ID");
+  const deploymentId = process.env.DENO_DEPLOYMENT_ID;
   const fallbackUrl = typeof deploymentId === "string"
     ? undefined
-    : `http://localhost:${Deno.env.get("PORT") ?? 8000}`;
+    : `http://localhost:${process.env.PORT ?? 8000}`;
 
   return {
-    url: Deno.env.get(
-      "DECO_ACTORS_SERVER_URL",
-    ) ??
+    url: process.env.DECO_ACTORS_SERVER_URL ??
       fallbackUrl ?? "",
     deploymentId: deploymentId && isLayeredUrl(deploymentId)
       ? deploymentId
