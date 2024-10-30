@@ -2,13 +2,12 @@
 // it contains the generated code for the actors in the folder
 // and generates an entrypoint that runs Deno.serve with actor runtime without dynamic imports. useful for caching purposes and run.
 
-import { dirname, fromFileUrl, join } from "@std/path";
+import { dirname, join } from "@std/path";
 import * as fs from "node:fs/promises";
 import process from "node:process";
 
 if (import.meta.main) {
-  const __dirname = dirname(fromFileUrl(import.meta.url)); // get the name of the directory
-  const actorsFolder = process.argv[0] ?? join(__dirname, "actors");
+  const actorsFolder = process.argv[0] ?? join(process.cwd(), "actors");
   const basedir = dirname(actorsFolder);
 
   const imports = [];
