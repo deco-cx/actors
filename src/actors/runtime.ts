@@ -41,16 +41,25 @@ const isEventStreamResponse = (
 /**
  * The name of the header used to specify the actor ID.
  */
-const ACTOR_NAME_PATH_PARAM = "actorName";
-const METHOD_NAME_PATH_PARAM = "methodName";
+const ACTORS_API_SEGMENT = "actors";
+const ACTORS_INVOKE_API_SEGMENT = "invoke";
 
-/**
- * The URL pattern for invoking an actor method.
- */
-export const actorInvokeUrl = new URLPattern({
-  pathname:
-    `/actors/:${ACTOR_NAME_PATH_PARAM}/invoke/:${METHOD_NAME_PATH_PARAM}`,
-});
+const parseActorInvokeApi = (pathname: string) => {
+  if (!pathname) {
+    return null;
+  }
+  const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const [_, actorsApiSegment, actorName, invokeApiSegment, methodName] =
+    normalized
+      .split("/");
+  if (
+    actorsApiSegment !== ACTORS_API_SEGMENT ||
+    invokeApiSegment !== ACTORS_INVOKE_API_SEGMENT
+  ) {
+    return null;
+  }
+  return { actorName, methodName };
+};
 
 // deno-lint-ignore no-explicit-any
 type Function = (...args: any) => any;
@@ -238,13 +247,12 @@ export class ActorRuntime {
 
     this.ensureInitialized(actorId);
 
-    const result = actorInvokeUrl.exec(url);
+    const result = parseActorInvokeApi(url.pathname);
     if (!result) {
       return new Response(null, { status: 404 });
     }
-    const groups = result?.pathname.groups ?? {};
-    const actorName = groups[ACTOR_NAME_PATH_PARAM];
-    const method = groups[METHOD_NAME_PATH_PARAM];
+    const actorName = result.actorName;
+    const method = result.methodName;
     if (!method || !actorName) {
       return new Response(
         `method ${method} not found for the actor ${actorName}`,
