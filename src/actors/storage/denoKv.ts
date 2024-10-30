@@ -1,4 +1,5 @@
 import { join } from "@std/path";
+import process from "node:process";
 import type {
   ActorStorage,
   ActorStorageListOptions,
@@ -11,17 +12,18 @@ export interface StorageOptions {
   atomicOp?: AtomicOp;
 }
 
-const ACTORS_KV_DATABASE = Deno.env.get("ACTORS_KV_DATABASE") ??
-  join(Deno.cwd(), "kv");
+const ACTORS_KV_DATABASE = process.env.ACTORS_KV_DATABASE ??
+  join(__dirname, "kv");
 
-const ACTORS_DENO_KV_TOKEN = Deno.env.get("ACTORS_DENO_KV_TOKEN");
-ACTORS_DENO_KV_TOKEN &&
-  Deno.env.set("DENO_KV_ACCESS_TOKEN", ACTORS_DENO_KV_TOKEN);
+const ACTORS_DENO_KV_TOKEN = process.env.ACTORS_DENO_KV_TOKEN;
+if (ACTORS_DENO_KV_TOKEN) {
+  process.env.DENO_KV_ACCESS_TOKEN = ACTORS_DENO_KV_TOKEN;
+}
 
 let kv: Deno.Kv | null = null;
 
 try {
-  kv = await Deno.openKv(ACTORS_KV_DATABASE);
+  kv = await Deno?.openKv(ACTORS_KV_DATABASE);
 } catch {
   // ignore
 }
