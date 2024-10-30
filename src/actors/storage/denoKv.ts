@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { dirname, fromFileUrl, join } from "@std/path";
 import process from "node:process";
 import type {
   ActorStorage,
@@ -12,6 +12,7 @@ export interface StorageOptions {
   atomicOp?: AtomicOp;
 }
 
+const __dirname = dirname(fromFileUrl(import.meta.url)); // get the name of the directory
 const ACTORS_KV_DATABASE = process.env.ACTORS_KV_DATABASE ??
   join(__dirname, "kv");
 
