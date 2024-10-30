@@ -13,7 +13,7 @@ export interface StorageOptions {
 }
 
 const ACTORS_KV_DATABASE = process.env.ACTORS_KV_DATABASE ??
-  join(__dirname, "kv");
+  join(process.cwd(), "kv");
 
 const ACTORS_DENO_KV_TOKEN = process.env.ACTORS_DENO_KV_TOKEN;
 if (ACTORS_DENO_KV_TOKEN) {

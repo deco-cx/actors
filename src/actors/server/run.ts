@@ -7,7 +7,7 @@ import * as fs from "node:fs/promises";
 import process from "node:process";
 import { type ActorConstructor, ActorRuntime } from "../runtime.ts";
 if (import.meta.main) {
-  const actorsFolder = process.argv[0] ?? join(__dirname, "actors");
+  const actorsFolder = process.argv[0] ?? join(process.cwd(), "actors");
   const actors: ActorConstructor[] = [];
 
   // dynamically import all actors in the actors folder.
