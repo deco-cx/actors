@@ -111,6 +111,19 @@ export class ActorRuntime {
     return this.fetch(req);
   }
 
+  actorId(req: Request): string | null;
+  actorId(url: URL, req: Request): string | null;
+  actorId(reqOrUrl: URL | Request, req?: Request): string | null {
+    if (reqOrUrl instanceof Request) {
+      return this.actorId(new URL(reqOrUrl.url), reqOrUrl);
+    }
+    if (reqOrUrl instanceof URL && req instanceof Request) {
+      return req.headers.get(ACTOR_ID_HEADER_NAME) ??
+        reqOrUrl.searchParams.get(ACTOR_ID_QS_NAME);
+    }
+    return null;
+  }
+
   /**
    * Handles an incoming request and invokes the corresponding actor method.
    * @param req - The incoming request.
@@ -118,8 +131,7 @@ export class ActorRuntime {
    */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const actorId = req.headers.get(ACTOR_ID_HEADER_NAME) ??
-      url.searchParams.get(ACTOR_ID_QS_NAME);
+    const actorId = this.actorId(url, req);
     if (!actorId) {
       return new Response(`missing ${ACTOR_ID_HEADER_NAME} header`, {
         status: 400,
