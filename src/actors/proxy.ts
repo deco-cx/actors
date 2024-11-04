@@ -5,11 +5,11 @@ export type { ActorProxy };
 export interface ActorsServer {
   url: string;
   deploymentId?: string;
-  actorIdHeaderName?: string;
 }
 
 export interface ActorsOptions {
   server?: ActorsServer;
+  actorIdHeaderName?: string;
   errorHandling?: Record<string, new (...args: any[]) => Error>;
 }
 /**
