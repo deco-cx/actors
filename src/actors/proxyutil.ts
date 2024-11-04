@@ -225,7 +225,8 @@ export const createHttpInvoker = <
           signal: abortCtrl.signal,
           headers: {
             "Content-Type": "application/json",
-            [ACTOR_ID_HEADER_NAME]: actorId,
+            [options?.server?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]:
+              actorId,
             ...actorsServer.deploymentId
               ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
               : {},

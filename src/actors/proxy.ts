@@ -5,6 +5,7 @@ export type { ActorProxy };
 export interface ActorsServer {
   url: string;
   deploymentId?: string;
+  actorIdHeaderName?: string;
 }
 
 export interface ActorsOptions {
