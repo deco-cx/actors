@@ -237,7 +237,7 @@ export class ActorRuntime {
           Object.getOwnPropertyNames(err),
         );
         return new Response(serializedError, {
-          status: 500,
+          status: 400,
           headers: {
             [ACTOR_CONSTRUCTOR_NAME_HEADER]: constructorName,
             "content-type": "application/json",
