@@ -4,6 +4,7 @@ import type { Actor, ActorConstructor } from "./runtime.ts";
 export type { ActorProxy };
 export interface ActorsServer {
   url: string;
+  credentials?: RequestCredentials;
   deploymentId?: string;
 }
 

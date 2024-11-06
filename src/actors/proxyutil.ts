@@ -223,6 +223,7 @@ export const createHttpInvoker = <
         {
           method: "POST",
           signal: abortCtrl.signal,
+          credentials: actorsServer?.credentials,
           headers: {
             "Content-Type": "application/json",
             [options?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]: actorId,
