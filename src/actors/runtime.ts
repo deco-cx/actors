@@ -11,7 +11,6 @@ import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { S3ActorStorage } from "./storage/s3.ts";
 import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
-import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 import {
   type ServerSentEventMessage,
@@ -191,7 +190,7 @@ export class ActorRuntime {
               for await (const content of res) {
                 controller.enqueue({
                   data: encodeURIComponent(
-                    JSON.stringify(content, serializeUint8Array),
+                    JSON.stringify(content),
                   ),
                   id: Date.now().toString(),
                   event: "message",

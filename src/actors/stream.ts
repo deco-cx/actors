@@ -1,5 +1,3 @@
-import { deserializeUint8Array } from "./util/buffers.ts";
-
 export const EVENT_STREAM_RESPONSE_HEADER: string = "text/event-stream";
 export async function* readFromStream<T>(
   response: Response,
@@ -30,7 +28,7 @@ export async function* readFromStream<T>(
 
       try {
         const chunk = data.replace("data:", "");
-        yield JSON.parse(decodeURIComponent(chunk), deserializeUint8Array);
+        yield JSON.parse(decodeURIComponent(chunk));
       } catch (_err) {
         console.log("error parsing data", _err, data);
         continue;
@@ -43,7 +41,6 @@ export async function* readFromStream<T>(
     try {
       yield JSON.parse(
         decodeURIComponent(buffer.replace("data:", "")),
-        deserializeUint8Array,
       );
     } catch (_err) {
       console.log("error parsing data", _err, buffer);
