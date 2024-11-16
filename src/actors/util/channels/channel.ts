@@ -46,15 +46,7 @@ export const isUpgrade = (
  * @returns The linked abort signal.
  */
 export const link = (...signals: AbortSignal[]): AbortSignal => {
-  const ctrl = new AbortController();
-  for (const signal of signals) {
-    signal.addEventListener("abort", (evt) => {
-      if (!ctrl.signal.aborted) {
-        ctrl.abort(evt);
-      }
-    });
-  }
-  return ctrl.signal;
+  return AbortSignal.any(signals);
 };
 
 export class ClosedChannelError extends Error {

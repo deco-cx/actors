@@ -1,10 +1,14 @@
+// deno-lint-ignore-file no-explicit-any
 import process from "node:process";
 import type { ActorsOptions, ActorsServer } from "./proxy.ts";
+import type { InvokeRequest, InvokeResponse } from "./rpc.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
 import {
+  type Channel,
   type ChannelUpgrader,
   type DuplexChannel,
+  makeChan,
   makeWebSocket,
 } from "./util/channels/channel.ts";
 
@@ -19,11 +23,9 @@ export type Fulfilled<R, T> = ((result: R) => T | PromiseLike<T>) | null;
 /**
  * Promise.then onrejected callback type.
  */
-// deno-lint-ignore no-explicit-any
 export type Rejected<E> = ((reason: any) => E | PromiseLike<E>) | null;
 
 export interface ActorInvoker<
-  // deno-lint-ignore no-explicit-any
   TResponse = any,
   TChannel extends DuplexChannel<unknown, unknown> = DuplexChannel<
     unknown,
@@ -47,13 +49,14 @@ export interface ActorInvoker<
 }
 export class ActorAwaiter<
   TResponse,
-  TChannel extends DuplexChannel<unknown, unknown>,
+  TChannel extends DuplexChannel<any, any>,
 > implements
   PromiseLike<
     TResponse
   >,
-  DuplexChannel<unknown, unknown> {
+  DuplexChannel<any, any> {
   ch: Promise<TChannel> | null = null;
+  ctrl: AbortController;
   constructor(
     protected actorName: string,
     protected actorMethod: string,
@@ -61,6 +64,7 @@ export class ActorAwaiter<
     protected invoker: ActorInvoker<TResponse, TChannel>,
     protected mMetadata?: unknown,
   ) {
+    this.ctrl = new AbortController();
   }
   [Symbol.dispose](): void {
     this.close();
@@ -70,15 +74,22 @@ export class ActorAwaiter<
     await ch.close();
   }
   get signal() {
-    return new AbortSignal();
+    return this.ctrl.signal;
   }
   get closed() {
     return this.channel.then((ch) => ch.closed);
   }
 
-  async *recv(signal?: AbortSignal): AsyncIterableIterator<unknown> {
+  async *recv(signal?: AbortSignal): AsyncIterableIterator<any> {
     const ch = await this.channel;
-    yield* ch.recv(signal);
+    const it = ch.recv(signal);
+    const retn = it.return;
+    it.return = (val) => {
+      ch.close();
+      this.ch = null;
+      return retn?.call(it, val) ?? val;
+    };
+    yield* it;
   }
 
   private get channel(): Promise<TChannel> {
@@ -148,6 +159,7 @@ export type ActorProxy<Actor> =
   }
   & (Actor extends { metadata?: infer TMetadata } ? {
       withMetadata(metadata: TMetadata): ActorProxy<Actor>;
+      rpc(): ActorProxy<Actor> & Disposable;
     }
     // deno-lint-ignore ban-types
     : {});
@@ -185,6 +197,85 @@ const initServer = (): ActorsServer => {
       ? deploymentId
       : undefined,
   };
+};
+
+export const createRPCInvoker = <
+  TResponse,
+  TChannel extends DuplexChannel<unknown, unknown>,
+>(
+  channel: DuplexChannel<InvokeRequest, InvokeResponse>,
+): ActorInvoker<TResponse, TChannel> => {
+  // Map to store pending requests
+  const pendingRequests = new Map<
+    string,
+    { response: PromiseWithResolvers<TResponse>; stream?: Channel<unknown> }
+  >();
+
+  // Start listening for responses
+  (async () => {
+    for await (const response of channel.recv()) {
+      const resolver = pendingRequests.get(response.id);
+      if (resolver) {
+        if ("error" in response) {
+          pendingRequests.delete(response.id);
+          if (response.constructorName) {
+            // Reconstruct the error if we have constructor information
+            const errorData = JSON.parse(response.error as string);
+            const error = Object.assign(
+              new Error(),
+              errorData,
+            );
+            error.constructor = { name: response.constructorName };
+            resolver.response.reject(error);
+          } else {
+            resolver.response.reject(response.error);
+          }
+        } else if ("stream" in response) {
+          if ("end" in response) {
+            resolver.stream?.close();
+            pendingRequests.delete(response.id);
+          } else if ("start" in response) {
+            resolver.stream = makeChan();
+            const it = resolver.stream.recv(channel.signal);
+            const retn = it.return;
+            it.return = (val) => {
+              return retn?.call(it, val) ?? val;
+            };
+            resolver.response.resolve(
+              it as TResponse,
+            );
+          } else if (resolver.stream) {
+            resolver.stream.send(response.result);
+          }
+        } else {
+          resolver.response.resolve(response.result);
+        }
+      }
+    }
+  })();
+
+  return {
+    invoke: async (name, method, methodArgs, metadata, connect) => {
+      if (connect) {
+        throw new Error("Connect not supported in RPC invoker");
+      }
+
+      const id = crypto.randomUUID();
+      const response = Promise.withResolvers<TResponse>();
+      pendingRequests.set(id, { response });
+
+      try {
+        await channel.send({
+          id,
+          invoke: [name, method, methodArgs, metadata, connect],
+        });
+        return await response.promise;
+      } catch (err) {
+        pendingRequests.delete(id);
+        throw err;
+      }
+    },
+  } as ActorInvoker<TResponse, TChannel>;
 };
 
 export const createHttpInvoker = <
@@ -287,10 +378,12 @@ export const createHttpInvoker = <
   };
 };
 
+export const WELL_KNOWN_RPC_MEHTOD = "_rpc";
 export const create = <TInstance extends Actor>(
   actor: ActorConstructor<TInstance> | string,
   invokerFactory: (id: string) => ActorInvoker,
   metadata?: unknown,
+  disposer?: () => void,
 ): { id: (id: string) => ActorProxy<TInstance> } => {
   const name = typeof actor === "string" ? actor : actor.name;
   return {
@@ -300,7 +393,30 @@ export const create = <TInstance extends Actor>(
           if (method === "withMetadata") {
             return (m: unknown) => create(actor, invokerFactory, m).id(id);
           }
+          if (method === Symbol.dispose && disposer) {
+            return disposer;
+          }
           const invoker = invokerFactory(id);
+          if (method === "rpc") {
+            return () => {
+              const awaiter = new ActorAwaiter(
+                name,
+                WELL_KNOWN_RPC_MEHTOD,
+                [],
+                invoker,
+                metadata,
+              );
+              const rpcInvoker = createRPCInvoker(awaiter);
+              return create(
+                actor,
+                () => rpcInvoker,
+                metadata,
+                () => awaiter.close(),
+              ).id(
+                id,
+              );
+            };
+          }
           return (...args: unknown[]) => {
             const awaiter = new ActorAwaiter(
               name,

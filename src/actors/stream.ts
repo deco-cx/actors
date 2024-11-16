@@ -50,3 +50,12 @@ export async function* readFromStream<T>(
     }
   }
 }
+
+export const isEventStreamResponse = (
+  invokeResponse: unknown | AsyncIterableIterator<unknown>,
+): invokeResponse is AsyncIterableIterator<unknown> => {
+  return (
+    typeof (invokeResponse as AsyncIterableIterator<unknown>)?.next ===
+      "function"
+  );
+};

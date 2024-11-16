@@ -1,5 +1,11 @@
 import { ActorError } from "./errors.ts";
-import { type ActorInvoker, create, createHttpInvoker } from "./proxyutil.ts";
+import {
+  type ActorInvoker,
+  create,
+  createHttpInvoker,
+  WELL_KNOWN_RPC_MEHTOD,
+} from "./proxyutil.ts";
+import { rpc } from "./rpc.ts";
 import type { ActorConstructor, ActorInstance } from "./runtime.ts";
 import { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
@@ -14,6 +20,9 @@ const KNOWN_METHODS: Record<string, symbol> = {
   "Symbol(Symbol.asyncDispose)": Symbol.asyncDispose,
   "Symbol(Symbol.dispose)": Symbol.dispose,
 };
+
+const isWellKnownRPCMethod = (methodName: string) =>
+  methodName === WELL_KNOWN_RPC_MEHTOD;
 
 export class ActorSilo {
   private actors: Map<string, ActorInstance> = new Map<string, ActorInstance>();
@@ -72,6 +81,10 @@ export class ActorSilo {
 
     await actorInstance.initialization;
     const method = KNOWN_METHODS[methodName] ?? methodName;
+    if (isWellKnownRPCMethod(String(method))) {
+      const chan = rpc(this.invoker);
+      return chan;
+    }
     if (!(method in actorInstance.actor)) {
       throw new ActorError(
         `method ${methodName} not found on actor ${actorName}`,
