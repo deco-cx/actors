@@ -1,3 +1,4 @@
+import { deserializeUint8Array, serializeUint8Array } from "../buffers.ts";
 import type { MessageSerializer } from "./channel.ts";
 
 export const jsonSerializer = <TSend, TReceive>(): MessageSerializer<
@@ -7,8 +8,8 @@ export const jsonSerializer = <TSend, TReceive>(): MessageSerializer<
 > => {
   return {
     deserialize: (msg) => {
-      return JSON.parse(msg);
+      return JSON.parse(msg, deserializeUint8Array);
     },
-    serialize: JSON.stringify,
+    serialize: (msg) => JSON.stringify(msg, serializeUint8Array),
   };
 };

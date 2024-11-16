@@ -5,6 +5,7 @@ import type { ActorState } from "./state.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
+const HELLO_COUNT = 5000;
 class Hello {
   sayHello(): string {
     return "Hello, World!";
@@ -12,7 +13,7 @@ class Hello {
 
   chan(name: string): ChannelUpgrader<string, string> {
     return (async ({ send }) => {
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < HELLO_COUNT; i++) {
         await send(`Hello ${name} ${i}`);
       }
     });
@@ -121,7 +122,8 @@ Deno.test("counter tests", async () => {
 
   await ch.close();
 
-  for (const actor of [counterActor, rpcActor]) {
+  for (const actor of [rpcActor, counterActor]) {
+    const p = performance.now();
     const watcher = await actor.watch();
 
     assertEquals(await actor.withMetadata({ extraSum: 10 }).getCount(), 10);
@@ -152,15 +154,21 @@ Deno.test("counter tests", async () => {
 
     const prevReqCount = reqCount;
     assertEquals(await actor.callSayHello(), "Hello, World!");
-    assertEquals(reqCount, prevReqCount + 1); // does not need a new request for invoking another actor method
+    const offset = actor === rpcActor ? 0 : 1; // rpc actor does not need a new request for invoking another actor method
+    assertEquals(reqCount, prevReqCount + offset);
 
     const prevReqCountHello = reqCount;
     const helloChan = await actor.readHelloChan(name);
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < HELLO_COUNT; i++) {
       const { value } = await helloChan.next();
       assertEquals(`Hello ${name} ${i}`, value);
     }
     helloChan.return?.();
-    assertEquals(reqCount, prevReqCountHello + 1); // does not need a new request for invoking another actor method
+    assertEquals(reqCount, prevReqCountHello + offset); // does not need a new request for invoking another actor method
+    console.log(
+      `${actor === rpcActor ? "[RPC]" : "[REQ-BASED]"}`,
+      "actor took",
+      performance.now() - p,
+    );
   }
 });

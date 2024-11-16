@@ -236,8 +236,13 @@ export const createRPCInvoker = <
             pendingRequests.delete(response.id);
           } else if ("start" in response) {
             resolver.stream = makeChan();
+            const it = resolver.stream.recv(channel.signal);
+            const retn = it.return;
+            it.return = (val) => {
+              return retn?.call(it, val) ?? val;
+            };
             resolver.response.resolve(
-              resolver.stream.recv(channel.signal) as TResponse,
+              it as TResponse,
             );
           } else if (resolver.stream) {
             resolver.stream.send(response.result);

@@ -82,7 +82,7 @@ export class ActorSilo {
     await actorInstance.initialization;
     const method = KNOWN_METHODS[methodName] ?? methodName;
     if (isWellKnownRPCMethod(String(method))) {
-      const chan = rpc(createHttpInvoker(this.actorId));
+      const chan = rpc(this.invoker);
       return chan;
     }
     if (!(method in actorInstance.actor)) {
