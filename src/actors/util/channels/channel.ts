@@ -1,6 +1,10 @@
-import { Queue } from "@core/asyncutil/queue";
+// deno-lint-ignore-file no-explicit-any
+import { Queue } from "./queue.ts";
 import { jsonSerializer } from "./serializers.ts";
 
+/**
+ * Represents a channel for asynchronous communication.
+ */
 export interface Channel<T> {
   closed: Promise<void>;
   signal: AbortSignal;
@@ -10,31 +14,37 @@ export interface Channel<T> {
 }
 
 /**
+ * Error thrown when attempting to interact with a closed channel.
+ */
+export class ClosedChannelError extends Error {
+  static readonly instance = new ClosedChannelError();
+  private constructor() {
+    super("Channel is closed");
+  }
+}
+
+/**
  * Checks if a value is a channel.
  *
  * @param v - The value to check.
- *
  * @returns True if the value is a channel, false otherwise.
  */
-export const isChannel = <
-  T,
-  TChannel extends Channel<T> = Channel<T>,
->(v: TChannel | unknown): v is TChannel => {
-  return typeof (v as TChannel).recv === "function" &&
-    typeof (v as TChannel).send === "function";
+export const isChannel = <T>(v: unknown): v is Channel<T> => {
+  return v != null &&
+    typeof (v as Channel<T>).recv === "function" &&
+    typeof (v as Channel<T>).send === "function";
 };
 
 /**
  * Checks if a value is a channel upgrader.
  *
  * @param v - The value to check.
- *
  * @returns True if the value is a channel upgrader, false otherwise.
  */
 export const isUpgrade = (
-  v: ChannelUpgrader<unknown, unknown> | unknown,
+  v: unknown,
 ): v is ChannelUpgrader<unknown, unknown> => {
-  return typeof (v as ChannelUpgrader<unknown, unknown>) === "function";
+  return typeof v === "function";
 };
 
 /**
@@ -42,85 +52,86 @@ export const isUpgrade = (
  * are aborted, the returned signal is also aborted.
  *
  * @param signals - The abort signals to link together.
- *
  * @returns The linked abort signal.
  */
 export const link = (...signals: AbortSignal[]): AbortSignal => {
-  return AbortSignal.any(signals);
+  return signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 };
 
-export class ClosedChannelError extends Error {
-  constructor() {
-    super("Channel is closed");
-  }
-}
+/**
+ * Creates a handler for closed channel errors.
+ *
+ * @param cb - Callback to execute when a closed channel error is caught.
+ */
 export const ifClosedChannel =
   (cb: () => Promise<void> | void) => (err: unknown) => {
-    if (err instanceof ClosedChannelError) {
-      return cb();
-    }
+    if (err instanceof ClosedChannelError) return cb();
     throw err;
   };
 
+/**
+ * Utility function to ignore closed channel errors.
+ */
 export const ignoreIfClosed = ifClosedChannel(() => {});
+
+/**
+ * Creates a new channel with the specified capacity.
+ *
+ * @param capacity - The buffer capacity of the channel (default: 0).
+ * @returns A new channel instance.
+ */
 export const makeChan = <T>(capacity = 0): Channel<T> => {
-  let currentCapacity = capacity;
-  const queue: Queue<{ value: T; resolve: () => void }> = new Queue();
+  const queue = new Queue<{ value: T; resolve: () => void }>();
   const ctrl = new AbortController();
-  const abortPromise = Promise.withResolvers<void>();
-  ctrl.signal.onabort = () => {
-    abortPromise.resolve();
-  };
+  const { promise: closed, resolve: resolveClose } = Promise.withResolvers<
+    void
+  >();
+
+  ctrl.signal.addEventListener("abort", () => resolveClose(), { once: true });
 
   const send = (value: T): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (ctrl.signal.aborted) reject(new ClosedChannelError());
-      let mResolve = resolve;
-      if (currentCapacity > 0) {
-        currentCapacity--;
-        mResolve = () => {
-          currentCapacity++;
-        };
-        resolve();
+    if (ctrl.signal.aborted) throw ClosedChannelError.instance;
+
+    if (capacity > 0) {
+      if (queue.size < capacity) {
+        queue.push({ value, resolve: () => {} });
+        return Promise.resolve();
       }
-      queue.push({ value, resolve: mResolve });
+    }
+
+    return new Promise<void>((resolve) => {
+      queue.push({ value, resolve });
     });
   };
 
-  const close = () => {
-    ctrl.abort();
-  };
+  const close = () => ctrl.abort();
 
-  const recv = async function* (
-    signal?: AbortSignal,
-  ): AsyncIterableIterator<T> {
+  async function* recv(signal?: AbortSignal): AsyncIterableIterator<T> {
     const linked = signal ? link(ctrl.signal, signal) : ctrl.signal;
-    while (true) {
-      if (linked.aborted) {
-        return;
-      }
-      try {
+
+    try {
+      while (!linked.aborted) {
         const next = await queue.pop({ signal: linked });
         next.resolve();
         yield next.value;
-      } catch (_err) {
-        if (linked.aborted) {
-          return;
-        }
-        throw _err;
       }
+    } catch (err) {
+      if (!linked.aborted) throw err;
     }
-  };
+  }
 
   return {
     send,
     recv,
     close,
     signal: ctrl.signal,
-    closed: abortPromise.promise,
+    closed,
   };
 };
 
+/**
+ * Represents a bidirectional channel.
+ */
 export interface DuplexChannel<TSend, TReceive> extends Disposable {
   send: Channel<TSend>["send"];
   recv: Channel<TReceive>["recv"];
@@ -136,31 +147,37 @@ export type ChannelUpgrader<TSend, TReceive = TSend> = (
   ch: DuplexChannel<TSend, TReceive>,
 ) => Promise<void> | void;
 
-// deno-lint-ignore no-explicit-any
+/**
+ * Represents a message that can be sent through a channel.
+ */
 export type Message<TMessageProperties = any> = TMessageProperties & {
   chunk?: Uint8Array;
 };
 
+/**
+ * Interface for message serialization/deserialization.
+ */
 export interface MessageSerializer<
   TSend,
   TReceive,
   TRawFormat extends string | ArrayBufferLike | ArrayBufferView | Blob,
 > {
   binaryType?: BinaryType;
-  serialize: (
-    msg: Message<TSend>,
-  ) => TRawFormat;
+  serialize: (msg: Message<TSend>) => TRawFormat;
   deserialize: (str: TRawFormat) => Message<TReceive>;
 }
 
+/**
+ * Creates a WebSocket-based duplex channel.
+ *
+ * @param socket - The WebSocket instance to use.
+ * @param _serializer - Optional message serializer.
+ * @returns A promise that resolves to a duplex channel.
+ */
 export const makeWebSocket = <
   TSend,
   TReceive,
-  TMessageFormat extends string | ArrayBufferLike | ArrayBufferView | Blob =
-    | string
-    | ArrayBufferLike
-    | ArrayBufferView
-    | Blob,
+  TMessageFormat extends string | ArrayBufferLike | ArrayBufferView | Blob,
 >(
   socket: WebSocket,
   _serializer?: MessageSerializer<TSend, TReceive, TMessageFormat>,
@@ -169,59 +186,70 @@ export const makeWebSocket = <
     jsonSerializer<Message<TSend>, Message<TReceive>>();
   const sendChan = makeChan<Message<TSend>>();
   const recvChan = makeChan<Message<TReceive>>();
-  const ch = Promise.withResolvers<
+  const { promise, resolve, reject } = Promise.withResolvers<
     DuplexChannel<Message<TSend>, Message<TReceive>>
   >();
+
   socket.binaryType = serializer.binaryType ?? "blob";
-  socket.onclose = () => {
+
+  const cleanup = () => {
     sendChan.close();
     recvChan.close();
   };
+
+  socket.onclose = cleanup;
   socket.onerror = (err) => {
     socket.close();
-    ch.reject(err);
+    reject(err);
   };
-  socket.onmessage = async (msg) => {
-    if (recvChan.signal.aborted) {
-      return;
+
+  socket.onmessage = (msg) => {
+    if (!recvChan.signal.aborted) {
+      recvChan.send(serializer.deserialize(msg.data)).catch(console.error);
     }
-    await recvChan.send(serializer.deserialize(msg.data));
   };
-  socket.onopen = async () => {
-    ch.resolve({
+
+  socket.onopen = () => {
+    const channel: DuplexChannel<Message<TSend>, Message<TReceive>> = {
       closed: Promise.race([recvChan.closed, sendChan.closed]),
       signal: link(recvChan.signal, sendChan.signal),
       recv: recvChan.recv.bind(recvChan),
       send: sendChan.send.bind(recvChan),
       close: () => socket.close(),
       [Symbol.dispose]: () => socket.close(),
-    });
-    for await (const message of sendChan.recv()) {
+    };
+
+    resolve(channel);
+
+    (async () => {
       try {
-        socket.send(
-          serializer.serialize(message),
-        );
-      } catch (_err) {
-        console.error("error sending message through socket", _err, message);
+        for await (const message of sendChan.recv()) {
+          socket.send(serializer.serialize(message));
+        }
+      } catch (err) {
+        console.error("Error in send loop:", err);
+      } finally {
+        socket.close();
       }
-    }
-    socket.close();
+    })();
   };
-  return ch.promise;
+
+  return promise;
 };
 
 /**
- * Creates a new duplex channel.
- * @param upgrader the channel upgrader
- * @returns a created duplex channel
+ * Creates a new duplex channel with existing channels.
+ *
+ * @param sendChan - The channel to use for sending.
+ * @param recvChan - The channel to use for receiving.
+ * @param upgrader - Optional channel upgrader.
+ * @returns A new duplex channel.
  */
-export const makeDuplexChannel = <TSend, TReceive>(
+export const makeDuplexChannelWith = <TSend, TReceive>(
+  sendChan: Channel<TSend>,
+  recvChan: Channel<TReceive>,
   upgrader?: ChannelUpgrader<TSend, TReceive>,
 ): DuplexChannel<TSend, TReceive> => {
-  // Create internal send and receive channels
-  const sendChan = makeChan<TSend>();
-  const recvChan = makeChan<TReceive>();
-
   const duplexChannel: DuplexChannel<TSend, TReceive> = {
     closed: Promise.race([recvChan.closed, sendChan.closed]),
     signal: link(sendChan.signal, recvChan.signal),
@@ -237,7 +265,6 @@ export const makeDuplexChannel = <TSend, TReceive>(
     },
   };
 
-  // If there's an upgrader, we upgrade the duplex channel
   if (upgrader && isUpgrade(upgrader)) {
     upgrader({
       closed: duplexChannel.closed,
@@ -250,4 +277,20 @@ export const makeDuplexChannel = <TSend, TReceive>(
   }
 
   return duplexChannel;
+};
+
+/**
+ * Creates a new duplex channel.
+ *
+ * @param upgrader - Optional channel upgrader.
+ * @returns A new duplex channel.
+ */
+export const makeDuplexChannel = <TSend, TReceive>(
+  upgrader?: ChannelUpgrader<TSend, TReceive>,
+): DuplexChannel<TSend, TReceive> => {
+  return makeDuplexChannelWith(
+    makeChan<TSend>(),
+    makeChan<TReceive>(),
+    upgrader,
+  );
 };
