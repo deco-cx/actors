@@ -5,7 +5,7 @@ import type { ActorState } from "./state.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
-const HELLO_COUNT = 5000;
+const HELLO_COUNT = 200;
 class Hello {
   sayHello(): string {
     return "Hello, World!";

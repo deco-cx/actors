@@ -9,6 +9,7 @@ import {
   type ChannelUpgrader,
   type DuplexChannel,
   makeChan,
+  makeDuplexChannelWith,
   makeWebSocket,
 } from "./util/channels/channel.ts";
 
@@ -93,13 +94,47 @@ export class ActorAwaiter<
   }
 
   private get channel(): Promise<TChannel> {
-    return this.ch ??= this.invoker.invoke(
-      this.actorName,
-      this.actorMethod,
-      this.methodArgs,
-      this.mMetadata,
-      true,
-    );
+    if (this.ch) {
+      return this.ch;
+    }
+    const sendChan = makeChan();
+    const recvChan = makeChan();
+    const reliableCh = makeDuplexChannelWith(sendChan, recvChan) as TChannel;
+    const ch = Promise.resolve<TChannel>(reliableCh);
+    this.ch = ch;
+
+    const connect = () =>
+      this.invoker.invoke(
+        this.actorName,
+        this.actorMethod,
+        this.methodArgs,
+        this.mMetadata,
+        true,
+      );
+    const nextConnection = async () => {
+      const ch = await connect();
+      const recvLoop = async () => {
+        for await (const val of ch.recv(reliableCh.signal)) {
+          recvChan.send(val);
+        }
+      };
+      const sendLoop = async () => {
+        for await (const val of sendChan.recv(ch.signal)) {
+          ch.send(val);
+        }
+      };
+      await Promise.all([recvLoop(), sendLoop()]);
+      if (ch.signal.aborted && !reliableCh.signal.aborted) {
+        console.log("channel closed, retrying...");
+        await new Promise((resolve) => setTimeout(resolve, 2e3)); // retrying in 2 second
+        return nextConnection();
+      }
+      ch.close();
+    };
+    nextConnection().catch((err) => {
+      console.error(`could not connect to websocket`, err);
+    });
+    return this.ch;
   }
 
   async send(value: unknown): Promise<void> {
