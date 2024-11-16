@@ -10,8 +10,11 @@ import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { S3ActorStorage } from "./storage/s3.ts";
-import { EVENT_STREAM_RESPONSE_HEADER } from "./stream.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
+import {
+  EVENT_STREAM_RESPONSE_HEADER,
+  isEventStreamResponse,
+} from "./stream.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 import {
   type ServerSentEventMessage,
@@ -23,15 +26,6 @@ import {
  */
 // deno-lint-ignore no-empty-interface
 export interface Actor {}
-
-const isEventStreamResponse = (
-  invokeResponse: unknown | AsyncIterableIterator<unknown>,
-): invokeResponse is AsyncIterableIterator<unknown> => {
-  return (
-    typeof (invokeResponse as AsyncIterableIterator<unknown>)?.next ===
-      "function"
-  );
-};
 
 const ACTORS_API_SEGMENT = "actors";
 const ACTORS_INVOKE_API_SEGMENT = "invoke";

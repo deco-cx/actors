@@ -101,9 +101,11 @@ Deno.test("counter tests", async () => {
   const actorId = "1234";
   const counterProxy = actors.proxy(Counter);
 
-  const actor = counterProxy.id(actorId);
+  const counterActor = counterProxy.id(actorId);
+  using rpcActor = counterProxy.id("12345").rpc();
+
   const name = `Counter Actor`;
-  const ch = actor.chan(name);
+  const ch = counterActor.chan(name);
   const it = ch.recv();
   const { value, done } = await it.next();
 
@@ -119,44 +121,46 @@ Deno.test("counter tests", async () => {
 
   await ch.close();
 
-  const watcher = await actor.watch();
+  for (const actor of [counterActor, rpcActor]) {
+    const watcher = await actor.watch();
 
-  assertEquals(await actor.withMetadata({ extraSum: 10 }).getCount(), 10);
+    assertEquals(await actor.withMetadata({ extraSum: 10 }).getCount(), 10);
 
-  // Test increment
-  const number = await actor.increment();
-  assertEquals(number, 1);
+    // Test increment
+    const number = await actor.increment();
+    assertEquals(number, 1);
 
-  // Test getCount
-  assertEquals(await actor.getCount(), 1);
+    // Test getCount
+    assertEquals(await actor.getCount(), 1);
 
-  // Test increment again
-  assertEquals(await actor.increment(), 2);
+    // Test increment again
+    assertEquals(await actor.increment(), 2);
 
-  // Test getCount again
-  assertEquals(await actor.getCount(), 2);
+    // Test getCount again
+    assertEquals(await actor.getCount(), 2);
 
-  assertEquals(await actor.decrement(), 1);
+    assertEquals(await actor.decrement(), 1);
 
-  const counters = [1, 2, 1];
-  let idx = 0;
-  while (idx < counters.length) {
-    const { value, done } = await watcher.next();
-    assertEquals(value, counters[idx++]);
-    assertEquals(done, false);
+    const counters = [1, 2, 1];
+    let idx = 0;
+    while (idx < counters.length) {
+      const { value, done } = await watcher.next();
+      assertEquals(value, counters[idx++]);
+      assertEquals(done, false);
+    }
+    watcher.return?.();
+
+    const prevReqCount = reqCount;
+    assertEquals(await actor.callSayHello(), "Hello, World!");
+    assertEquals(reqCount, prevReqCount + 1); // does not need a new request for invoking another actor method
+
+    const prevReqCountHello = reqCount;
+    const helloChan = await actor.readHelloChan(name);
+    for (let i = 0; i < 10; i++) {
+      const { value } = await helloChan.next();
+      assertEquals(`Hello ${name} ${i}`, value);
+    }
+    helloChan.return?.();
+    assertEquals(reqCount, prevReqCountHello + 1); // does not need a new request for invoking another actor method
   }
-  watcher.return?.();
-
-  const prevReqCount = reqCount;
-  assertEquals(await actor.callSayHello(), "Hello, World!");
-  assertEquals(reqCount, prevReqCount + 1); // does not need a new request for invoking another actor method
-
-  const prevReqCountHello = reqCount;
-  const helloChan = await actor.readHelloChan(name);
-  for (let i = 0; i < 10; i++) {
-    const { value } = await helloChan.next();
-    assertEquals(`Hello ${name} ${i}`, value);
-  }
-  helloChan.return?.();
-  assertEquals(reqCount, prevReqCountHello + 1); // does not need a new request for invoking another actor method
 });
