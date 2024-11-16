@@ -12,6 +12,7 @@ import {
   makeDuplexChannelWith,
   makeWebSocket,
 } from "./util/channels/channel.ts";
+import { retry } from "./util/retry.ts";
 
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
@@ -112,7 +113,11 @@ export class ActorAwaiter<
         true,
       );
     const nextConnection = async () => {
-      const ch = await connect();
+      const ch = await retry(connect, {
+        initialDelay: 1e3, // one second of initial delay
+        maxAttempts: 30, // 30 attempts
+        maxDelay: 10e3, // 10 seconds max delay
+      });
       const recvLoop = async () => {
         for await (const val of ch.recv(reliableCh.signal)) {
           recvChan.send(val);
