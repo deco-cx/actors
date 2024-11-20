@@ -14,8 +14,13 @@ export const withActors = (
     ? new ActorRuntime(rtOrActors)
     : rtOrActors;
   return async (ctx, next) => {
-    if (!ctx.req.path.startsWith(basePath)) {
+    const path = ctx.req.path;
+    if (!path.startsWith(basePath)) {
       return next();
+    }
+    if (path.endsWith(`${basePath}/__restart`)) {
+      console.log("Restarting actors...");
+      Deno.exit(1);
     }
     const response = await rt.fetch(ctx.req.raw);
     ctx.res = response;
