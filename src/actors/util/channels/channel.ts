@@ -52,10 +52,22 @@ export const isUpgrade = (
  * are aborted, the returned signal is also aborted.
  *
  * @param signals - The abort signals to link together.
+ *
  * @returns The linked abort signal.
  */
 export const link = (...signals: AbortSignal[]): AbortSignal => {
-  return signals.length === 1 ? signals[0] : AbortSignal.any(signals);
+  if (signals.length === 1) {
+    return signals[0];
+  }
+  const ctrl = new AbortController();
+  for (const signal of signals) {
+    signal.addEventListener("abort", (evt) => {
+      if (!ctrl.signal.aborted) {
+        ctrl.abort(evt);
+      }
+    });
+  }
+  return ctrl.signal;
 };
 
 /**
