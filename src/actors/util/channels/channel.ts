@@ -65,7 +65,7 @@ export const link = (...signals: AbortSignal[]): AbortSignal => {
       if (!ctrl.signal.aborted) {
         ctrl.abort(evt);
       }
-    });
+    }, { once: true });
   }
   return ctrl.signal;
 };
