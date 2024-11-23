@@ -74,6 +74,7 @@ export class ActorAwaiter<
   async close() {
     const ch = await this.channel;
     await ch.close();
+    this.ch = null;
   }
   get signal() {
     return this.ctrl.signal;
@@ -135,6 +136,7 @@ export class ActorAwaiter<
         return nextConnection();
       }
       ch.close();
+      this.ch = null;
     };
     nextConnection().catch((err) => {
       console.error(`could not connect to websocket`, err);
