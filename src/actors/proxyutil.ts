@@ -336,17 +336,19 @@ export const createHttpInvoker = <
     invoke: async (name, method, methodArgs, metadata, connect?: true) => {
       const endpoint = urlFor(actorsServer.url, name, method);
       if (connect) {
+        const url = new URL(`${endpoint}?args=${
+          encodeURIComponent(
+            btoa(
+              JSON.stringify({
+                args: methodArgs ?? [],
+                metadata: metadata ?? {},
+              }),
+            ),
+          )
+        }&${ACTOR_ID_QS_NAME}=${actorId}`);
+        url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
         const ws = new WebSocket(
-          `${endpoint}?args=${
-            encodeURIComponent(
-              btoa(
-                JSON.stringify({
-                  args: methodArgs ?? [],
-                  metadata: metadata ?? {},
-                }),
-              ),
-            )
-          }&${ACTOR_ID_QS_NAME}=${actorId}`,
+          url,
         );
         return makeWebSocket(ws) as Promise<TChannel>;
       }
