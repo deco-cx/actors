@@ -131,7 +131,7 @@ export class ActorAwaiter<
       };
       await Promise.all([recvLoop(), sendLoop()]);
       if (ch.signal.aborted && !reliableCh.signal.aborted) {
-        console.log("channel closed, retrying...");
+        console.error("channel closed, retrying...");
         await new Promise((resolve) => setTimeout(resolve, 2e3)); // retrying in 2 second
         return nextConnection();
       }
