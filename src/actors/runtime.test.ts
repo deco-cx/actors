@@ -103,7 +103,7 @@ Deno.test("counter tests", async () => {
   const counterProxy = actors.proxy(Counter);
 
   const counterActor = counterProxy.id(actorId);
-  using rpcActor = counterProxy.id("12345").rpc();
+  using rpcActor = counterProxy.id("12345", "1234").rpc();
 
   const name = `Counter Actor`;
   const ch = counterActor.chan(name);

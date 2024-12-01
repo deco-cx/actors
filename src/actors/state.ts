@@ -4,6 +4,7 @@ import type { ActorStorage } from "./storage.ts";
 
 export interface ActorStateOptions {
   id: string;
+  discriminator?: string;
   storage: ActorStorage;
   proxy: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
@@ -14,6 +15,7 @@ export interface ActorStateOptions {
  */
 export class ActorState {
   public id: string;
+  public discriminator?: string;
   public storage: ActorStorage;
   public proxy: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
@@ -23,6 +25,7 @@ export class ActorState {
     this.storage = options.storage;
     this.proxy = options.proxy;
     this.id = options.id;
+    this.discriminator = options.discriminator;
   }
 
   blockConcurrencyWhile<T>(callback: () => Promise<T>): Promise<T> {

@@ -2,6 +2,8 @@ import process from "node:process";
 import { ActorError } from "./errors.ts";
 import {
   ACTOR_CONSTRUCTOR_NAME_HEADER,
+  ACTOR_DISCRIMINATOR_HEADER_NAME,
+  ACTOR_DISCRIMINATOR_QS_NAME,
   ACTOR_ID_HEADER_NAME,
   ACTOR_ID_QS_NAME,
 } from "./proxyutil.ts";
@@ -10,11 +12,11 @@ import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { S3ActorStorage } from "./storage/s3.ts";
-import { serializeUint8Array } from "./util/buffers.ts";
 import {
   EVENT_STREAM_RESPONSE_HEADER,
   isEventStreamResponse,
 } from "./stream.ts";
+import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 import {
   type ServerSentEventMessage,
@@ -88,13 +90,16 @@ export class ActorRuntime {
     });
   }
 
-  private getOrCreateSilo(actorId: string): ActorSilo {
-    let silo = this.silos.get(actorId);
+  private getOrCreateSilo(actorId: string, discriminator?: string): ActorSilo {
+    let silo = this.silos.get(
+      discriminator ? `${actorId}#${discriminator}` : actorId,
+    );
     if (!silo) {
       silo = new ActorSilo(
         this.actorsConstructors,
         actorId,
         this.getActorStorage.bind(this),
+        discriminator,
       );
       this.silos.set(actorId, silo);
     }
@@ -119,6 +124,19 @@ export class ActorRuntime {
     return null;
   }
 
+  actorDiscriminator(req: Request): string | null;
+  actorDiscriminator(url: URL, req: Request): string | null;
+  actorDiscriminator(reqOrUrl: URL | Request, req?: Request): string | null {
+    if (reqOrUrl instanceof Request) {
+      return this.actorDiscriminator(new URL(reqOrUrl.url), reqOrUrl);
+    }
+    if (reqOrUrl instanceof URL && req instanceof Request) {
+      return req.headers.get(ACTOR_DISCRIMINATOR_HEADER_NAME) ??
+        reqOrUrl.searchParams.get(ACTOR_DISCRIMINATOR_QS_NAME);
+    }
+    return null;
+  }
+
   /**
    * Handles an incoming request and invokes the corresponding actor method.
    * @param req - The incoming request.
@@ -133,7 +151,10 @@ export class ActorRuntime {
       });
     }
 
-    const silo = this.getOrCreateSilo(actorId);
+    const silo = this.getOrCreateSilo(
+      actorId,
+      this.actorDiscriminator(url, req) || undefined,
+    );
 
     const result = parseActorInvokeApi(url.pathname);
     if (!result) {

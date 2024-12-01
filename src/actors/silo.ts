@@ -35,6 +35,7 @@ export class ActorSilo {
       actorId: string,
       actorName: string,
     ) => ActorStorage,
+    private discriminator?: string,
   ) {
     this.invoker = {
       invoke: this.invoke.bind(this),
@@ -47,6 +48,7 @@ export class ActorSilo {
       const storage = this.getActorStorage(this.actorId, Actor.name);
       const state = new ActorState({
         id: this.actorId,
+        discriminator: this.discriminator,
         storage,
         proxy: (actor) => {
           const invoker = (id: string) => {
