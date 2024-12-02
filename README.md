@@ -66,3 +66,57 @@ await counter.increment();
 const currentCount = await counter.getCount();
 console.log(`Current count: ${currentCount}`);
 ```
+
+### Cloudflare Workers
+
+The framework now supports Cloudflare Workers through Durable Objects, providing
+the same actor model with CF's global distribution and reliability.
+
+To deploy your actors on Cloudflare Workers:
+
+1. Create your worker script (using Hono):
+
+```typescript
+import { ActorCfRuntime, Env } from "@deco/actors/cf";
+import { withActors } from "@deco/actors/hono";
+import { Hono } from "hono";
+import { Counter } from "./counter.ts";
+export { ActorDurableObject } from "@deco/actors/cf";
+
+const app = new Hono<{ Bindings: Env }>();
+
+const runtime = new ActorCfRuntime([Counter]);
+app.use(withActors(runtime));
+
+app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
+
+export default app;
+```
+
+2. Configure your `wrangler.toml`
+
+```toml
+#:schema node_modules/wrangler/config-schema.json
+compatibility_flags = ["nodejs_compat"]
+name = "counter-actor"
+main = "src/index.ts"
+compatibility_date = "2024-11-27"
+
+# Workers Logs
+# Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
+# Configuration: https://developers.cloudflare.com/workers/observability/logs/workers-logs/#enable-workers-logs
+[observability]
+enabled = true
+
+[[durable_objects.bindings]]
+name = "ACTOR_DO"
+class_name = "ActorDurableObject"
+
+# Durable Object migrations.
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["ActorDurableObject"]
+```
+
+You check the full example [here](./examples/cf/)
