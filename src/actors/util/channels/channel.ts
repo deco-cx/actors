@@ -246,6 +246,7 @@ export const makeWebSocket = <
     })();
   };
 
+  socket?.accept?.();
   return promise;
 };
 

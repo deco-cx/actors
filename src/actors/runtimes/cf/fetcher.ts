@@ -13,7 +13,11 @@ export class ActorCfRuntime implements ActorFetcher<Env> {
     registerActors(actorsConstructors, () => {
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
-      server.accept();
+      const originalAccept = server.accept.bind(server);
+      server.accept = () => {
+        originalAccept();
+        server.dispatchEvent(new Event("open"));
+      };
       return {
         socket: server,
         response: new Response(null, {
