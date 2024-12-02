@@ -43,7 +43,11 @@
       "./examples"
     ]
   },
-  "lint": { "exclude": ["./examples"] },
+  "lint": {
+    "exclude": [
+      "./examples"
+    ]
+  },
   "lock": false,
-  "version": "0.14.0-beta.7"
+  "version": "0.14.0-beta.8"
 }
