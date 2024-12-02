@@ -34,7 +34,7 @@ export class ActorDurableObject {
       this.runtime.setWebSocketHandler(WEBSOCKET_HANDLER);
     }
     this.runtime.setDefaultActorStorage((options) =>
-      new DurableObjectActorStorage(state, options)
+      new DurableObjectActorStorage(state.storage, options)
     );
   }
 

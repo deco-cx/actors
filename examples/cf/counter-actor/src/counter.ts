@@ -13,7 +13,6 @@ export class Counter {
     });
   }
 
-
   async increment(): Promise<number> {
     this.count++;
     await this.state.storage.put("counter", this.count);

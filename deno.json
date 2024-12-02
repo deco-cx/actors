@@ -38,6 +38,12 @@
     "test": "rm kv;deno test -A --unstable-kv --env .",
     "release": "deno run -A jsr:@deco/scripts/release"
   },
+  "fmt": {
+    "exclude": [
+      "./examples"
+    ]
+  },
+  "lint": { "exclude": ["./examples"] },
   "lock": false,
   "version": "0.14.0-beta.7"
 }

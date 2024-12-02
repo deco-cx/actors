@@ -6,7 +6,7 @@ export { ActorDurableObject } from "@deco/actors/cf";
 const app = new Hono<{ Bindings: Env }>();
 
 const runtime = new ActorCfRuntime([Counter]);
-app.use(withActors(runtime))
+app.use(withActors(runtime));
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
 

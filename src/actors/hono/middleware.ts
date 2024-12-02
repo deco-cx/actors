@@ -6,10 +6,10 @@ import type { ActorFetcher } from "../runtime.ts";
  * Adds middleware to the Hono server that routes requests to actors.
  * the default base path is `/actors`.
  */
-export const withActors = (
-  fetcher: ActorFetcher,
+export const withActors = <TEnv extends object = object>(
+  fetcher: ActorFetcher<TEnv>,
   basePath = "/actors",
-): MiddlewareHandler => {
+): MiddlewareHandler<{ Bindings: TEnv }> => {
   return async (ctx, next) => {
     const path = ctx.req.path;
     if (!path.startsWith(basePath)) {

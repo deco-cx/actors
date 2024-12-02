@@ -10,12 +10,12 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
     "typescript": "^5.5.2",
-    "wrangler": "^3.91.0",
-    "@cloudflare/workers-types": "^4.20241127.0"
+    "wrangler": "^3.91.0"
   },
   "dependencies": {
-    "@deco/actors": "npm:@jsr/deco__actors@^0.14.0-beta.6",
+    "@deco/actors": "npm:@jsr/deco__actors@^0.14.0-beta.7",
     "hono": "^4.6.12"
   }
 }
