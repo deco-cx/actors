@@ -2,8 +2,8 @@
  * This file serve as a set of utility for ease running actors in production.
  * It is not required for running actors in production. But it is useful for removing boilerplate code when you just want to spin up an actor server.
  */
-import { join } from "@std/path";
 import * as fs from "node:fs/promises";
+import { join } from "node:path";
 import process from "node:process";
 import { type ActorConstructor, ActorRuntime } from "../runtime.ts";
 if (import.meta.main) {

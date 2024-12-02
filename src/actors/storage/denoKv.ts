@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import process from "node:process";
 import type {
   ActorStorage,
@@ -12,10 +12,10 @@ export interface StorageOptions {
   atomicOp?: AtomicOp;
 }
 
-const ACTORS_KV_DATABASE = process.env.ACTORS_KV_DATABASE ??
+const ACTORS_KV_DATABASE = process?.env?.ACTORS_KV_DATABASE ??
   join(process.cwd(), "kv");
 
-const ACTORS_DENO_KV_TOKEN = process.env.ACTORS_DENO_KV_TOKEN;
+const ACTORS_DENO_KV_TOKEN = process?.env?.ACTORS_DENO_KV_TOKEN;
 if (ACTORS_DENO_KV_TOKEN) {
   process.env.DENO_KV_ACCESS_TOKEN = ACTORS_DENO_KV_TOKEN;
 }

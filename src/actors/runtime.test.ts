@@ -1,4 +1,4 @@
-import { assertEquals, assertFalse } from "@std/assert";
+import { assertEquals, assertFalse } from "jsr:@std/assert@^1.0.5";
 import { actors } from "./proxy.ts";
 import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";

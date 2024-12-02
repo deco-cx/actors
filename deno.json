@@ -6,14 +6,16 @@
     "./proxy": "./src/actors/proxy.ts",
     "./watch": "./src/actors/util/watch.ts",
     "./server-run": "./src/actors/server/run.ts",
-    "./server-gen": "./src/actors/server/gen.ts"
+    "./server-gen": "./src/actors/server/gen.ts",
+    "./cf": "./src/actors/runtimes/cf/index.ts"
   },
   "publish": {
     "exclude": [
       "**/*.bench.ts",
       "**/*.test.ts",
       "MAINTAINERS.txt",
-      ".github"
+      ".github",
+      "./examples"
     ]
   },
   "compilerOptions": {
@@ -24,17 +26,24 @@
     ]
   },
   "imports": {
-    "@core/asyncutil": "jsr:@core/asyncutil@^1.1.1",
-    "@hono/hono": "jsr:@hono/hono@^4.6.2",
-    "@std/assert": "jsr:@std/assert@^1.0.5",
-    "@std/async": "jsr:@std/async@^1.0.5",
-    "@std/path": "jsr:@std/path@^1.0.6"
+    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@^4.20241127.0",
+    "@hono/hono": "jsr:@hono/hono@^4.6.2"
   },
   "tasks": {
     "check": "deno fmt && deno lint --fix && deno check ./src/actors/mod.ts ./src/actors/hono/middleware.ts",
     "test": "rm kv;deno test -A --unstable-kv --env .",
     "release": "deno run -A jsr:@deco/scripts/release"
   },
+  "fmt": {
+    "exclude": [
+      "./examples"
+    ]
+  },
+  "lint": {
+    "exclude": [
+      "./examples"
+    ]
+  },
   "lock": false,
-  "version": "0.13.7"
+  "version": "0.14.0-beta.10"
 }
