@@ -10,7 +10,18 @@ export interface Env {
 
 export class ActorCfRuntime implements ActorFetcher<Env> {
   constructor(protected actorsConstructors: Array<ActorConstructor>) {
-    registerActors(actorsConstructors);
+    registerActors(actorsConstructors, () => {
+      const webSocketPair = new WebSocketPair();
+      const [client, server] = Object.values(webSocketPair);
+      return {
+        socket: server,
+        response: new Response(null, {
+          status: 101,
+          // @ts-ignore: webSocket is not part of the Response type
+          webSocket: client,
+        }),
+      };
+    });
   }
   fetch(request: Request, env?: Env | undefined): Promise<Response> | Response {
     if (!env) {

@@ -1,5 +1,5 @@
 import { ActorState } from "@deco/actors";
-import { WatchTarget } from "@deco/actors/watch";
+import { ChannelUpgrader, WatchTarget } from "@deco/actors/watch";
 
 export class Counter {
   private count: number;
@@ -33,5 +33,15 @@ export class Counter {
 
   watch(): AsyncIterableIterator<number> {
     return this.watchTarget.subscribe();
+  }
+  chan(name: string): ChannelUpgrader<string, string> {
+    return (async ({ send, recv }) => {
+      await send(`Hello ${name}`);
+      for await (const str of recv()) {
+        if (str === "PING") {
+          await send("PONG");
+        }
+      }
+    });
   }
 }
