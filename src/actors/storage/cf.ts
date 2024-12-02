@@ -1,4 +1,4 @@
-import { DurableObjectStorage } from "@cloudflare/workers-types";
+import type { DurableObjectStorage } from "@cloudflare/workers-types";
 import type {
   ActorStorage,
   ActorStorageGetOptions,
@@ -172,9 +172,6 @@ export class DurableObjectActorStorage implements ActorStorage {
   }
 
   async atomic(closure: (st: ActorStorage) => Promise<void>): Promise<void> {
-    if (this.storage instanceof DurableObjectStorage) {
-      throw new Error("Atomic operations are not supported in Durable Objects");
-    }
     await this.storage.transaction(async (txn: DurableObjectTransaction) => {
       const storage = new DurableObjectActorStorage(txn, this.options);
       await closure(storage);
