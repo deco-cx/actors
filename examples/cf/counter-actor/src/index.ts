@@ -6,11 +6,7 @@ export { ActorDurableObject } from "@deco/actors/cf";
 const app = new Hono<{ Bindings: Env }>();
 
 const runtime = new ActorCfRuntime([Counter]);
-const mid = withActors(runtime)
-app.use(async (ctx, next) => {
-  await mid(ctx, next);
-  console.log(await ctx.res.text())
-});
+app.use(withActors(runtime));
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
 

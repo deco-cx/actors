@@ -35,9 +35,13 @@ export class Counter {
     return this.watchTarget.subscribe();
   }
   chan(name: string): ChannelUpgrader<string, string> {
+    console.log("HERE");
     return (async ({ send, recv }) => {
+      console.log("HERE1");
       await send(`Hello ${name}`);
+      console.log("Sent Hello");
       for await (const str of recv()) {
+        console.log({ str });
         if (str === "PING") {
           await send("PONG");
         }
