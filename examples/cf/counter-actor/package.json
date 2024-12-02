@@ -14,7 +14,7 @@
     "wrangler": "^3.91.0"
   },
   "dependencies": {
-    "@deco/actors": "npm:@jsr/deco__actors@^0.14.0-beta.2",
+    "@deco/actors": "npm:@jsr/deco__actors@^0.14.0-beta.4",
     "hono": "^4.6.12"
   }
 }

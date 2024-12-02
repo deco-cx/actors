@@ -38,7 +38,7 @@ export class ActorDurableObject {
     );
   }
 
-  fetch(request: Request) {
+  fetch(request: Request): Promise<Response> | Response {
     return this.runtime.fetch(request);
   }
 }
