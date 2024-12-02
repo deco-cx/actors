@@ -94,7 +94,9 @@ export class ActorRuntime implements ActorFetcher {
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
   ) {
-    this.websocketHandler = Deno?.upgradeWebSocket;
+    this.websocketHandler = typeof Deno === "object"
+      ? Deno?.upgradeWebSocket
+      : undefined;
   }
 
   setWebSocketHandler(
