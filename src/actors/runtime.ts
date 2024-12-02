@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import process from "node:process";
 import { ActorError } from "./errors.ts";
 import {
@@ -5,7 +6,6 @@ import {
   ACTOR_DISCRIMINATOR_HEADER_NAME,
   ACTOR_DISCRIMINATOR_QS_NAME,
   ACTOR_ID_HEADER_NAME,
-  ACTOR_ID_QS_NAME,
 } from "./proxyutil.ts";
 import { ActorSilo } from "./silo.ts";
 import type { ActorState } from "./state.ts";
@@ -18,10 +18,18 @@ import {
 } from "./stream.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
+import { actorId as getActorId } from "./util/id.ts";
 import {
   type ServerSentEventMessage,
   ServerSentEventStream,
 } from "./util/sse.ts";
+
+/**
+ * Represents a fetcher for actors.
+ */
+export interface ActorFetcher<TEnv = unknown> {
+  fetch: (request: Request, env?: TEnv) => Promise<Response> | Response;
+}
 
 /**
  * Represents an actor.
@@ -58,23 +66,52 @@ export interface ActorInstance {
   initialization: Promise<void>;
 }
 
+export interface WebSocketUpgrade {
+  socket: WebSocket;
+  response: Response;
+}
+export type WebSocketUpgradeHandler = (
+  req: Request,
+) => WebSocketUpgrade | Promise<WebSocketUpgrade>;
 /**
  * Represents the runtime for managing and invoking actors.
  */
-export class ActorRuntime {
+export class ActorRuntime implements ActorFetcher {
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
   private silos: Map<string, ActorSilo> = new Map<string, ActorSilo>();
+  private defaultActorStorage:
+    | ((
+      options: { actorId: string; actorName: string },
+    ) => ActorStorage)
+    | undefined;
 
+  private websocketHandler?: WebSocketUpgradeHandler;
   /**
    * Creates an instance of ActorRuntime.
    * @param actorsConstructors - An array of actor constructors.
    */
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
-  ) {}
+  ) {
+    this.websocketHandler = Deno?.upgradeWebSocket;
+  }
 
+  setWebSocketHandler(
+    handler: WebSocketUpgradeHandler,
+  ) {
+    this.websocketHandler = handler;
+  }
+
+  setDefaultActorStorage(
+    storageCreator: typeof this.defaultActorStorage,
+  ) {
+    this.defaultActorStorage = storageCreator;
+  }
   getActorStorage(actorId: string, actorName: string): ActorStorage {
+    if (this.defaultActorStorage) {
+      return this.defaultActorStorage({ actorId, actorName });
+    }
     const storage = process.env.DECO_ACTORS_STORAGE;
 
     if (storage === "s3") {
@@ -111,19 +148,6 @@ export class ActorRuntime {
     return this.fetch(req);
   }
 
-  actorId(req: Request): string | null;
-  actorId(url: URL, req: Request): string | null;
-  actorId(reqOrUrl: URL | Request, req?: Request): string | null {
-    if (reqOrUrl instanceof Request) {
-      return this.actorId(new URL(reqOrUrl.url), reqOrUrl);
-    }
-    if (reqOrUrl instanceof URL && req instanceof Request) {
-      return req.headers.get(ACTOR_ID_HEADER_NAME) ??
-        reqOrUrl.searchParams.get(ACTOR_ID_QS_NAME);
-    }
-    return null;
-  }
-
   actorDiscriminator(req: Request): string | null;
   actorDiscriminator(url: URL, req: Request): string | null;
   actorDiscriminator(reqOrUrl: URL | Request, req?: Request): string | null {
@@ -144,7 +168,7 @@ export class ActorRuntime {
    */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const actorId = this.actorId(url, req);
+    const actorId = getActorId(url, req);
     if (!actorId) {
       return new Response(`missing ${ACTOR_ID_HEADER_NAME} header`, {
         status: 400,
@@ -169,7 +193,8 @@ export class ActorRuntime {
     }
     let args = [], metadata = {};
     if (req.headers.get("content-type")?.includes("application/json")) {
-      const { args: margs, metadata: maybeMetadata } = await req.json();
+      const { args: margs, metadata: maybeMetadata } = (await req
+        .json()) as any;
       args = margs;
       metadata = maybeMetadata;
     } else if (url.searchParams.get("args")) {
@@ -189,7 +214,10 @@ export class ActorRuntime {
         metadata,
       );
       if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
-        const { socket, response } = Deno?.upgradeWebSocket(req);
+        if (!this.websocketHandler) {
+          return new Response("WebSockets are not supported", { status: 400 });
+        }
+        const { socket, response } = await this.websocketHandler(req);
         makeWebSocket(socket).then((ch) => res(ch)).finally(() =>
           socket.close()
         );

@@ -430,9 +430,10 @@ export const createHttpInvoker = <
       if (
         resp.headers.get("content-type")?.includes("application/octet-stream")
       ) {
+        // @ts-ignore: cf types mess with typings.
         return new Uint8Array(await resp.arrayBuffer());
       }
-      return resp.json();
+      return resp.json() as Promise<any>;
     },
   };
 };
