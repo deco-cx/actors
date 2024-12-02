@@ -6,7 +6,8 @@
     "./proxy": "./src/actors/proxy.ts",
     "./watch": "./src/actors/util/watch.ts",
     "./server-run": "./src/actors/server/run.ts",
-    "./server-gen": "./src/actors/server/gen.ts"
+    "./server-gen": "./src/actors/server/gen.ts",
+    "./cf": "./src/actors/runtimes/cf/index.ts"
   },
   "publish": {
     "exclude": [
