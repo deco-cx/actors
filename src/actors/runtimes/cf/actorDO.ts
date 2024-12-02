@@ -6,7 +6,7 @@ import {
   type WebSocketUpgradeHandler,
 } from "../../runtime.ts";
 import { DurableObjectActorStorage } from "../../storage/cf.ts";
-import type { Env } from "./runtime.ts";
+import type { Env } from "./fetcher.ts";
 
 let REGISTERED_ACTORS: ActorConstructor[] = [];
 let WEBSOCKET_HANDLER: WebSocketUpgradeHandler | undefined;
