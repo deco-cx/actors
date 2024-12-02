@@ -13,7 +13,8 @@
       "**/*.bench.ts",
       "**/*.test.ts",
       "MAINTAINERS.txt",
-      ".github"
+      ".github",
+      "./examples"
     ]
   },
   "compilerOptions": {
