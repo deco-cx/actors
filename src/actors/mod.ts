@@ -8,4 +8,3 @@ export type { ActorConstructor } from "./runtime.ts";
 export { ActorState } from "./state.ts";
 export { type ActorStorage } from "./storage.ts";
 export { actorId } from "./util/id.ts";
-

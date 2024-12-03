@@ -26,7 +26,6 @@
     ]
   },
   "imports": {
-    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@^4.20241127.0",
     "@hono/hono": "jsr:@hono/hono@^4.6.2"
   },
   "tasks": {
