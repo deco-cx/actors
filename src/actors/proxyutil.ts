@@ -319,6 +319,13 @@ export const createRPCInvoker = <
           const recv = makeChan();
           const send = makeChan();
           const chan = makeDuplexChannelWith(send, recv);
+          chan.closed.finally(() => {
+            pendingRequests.delete(response.id);
+            channel.send({
+              id: response.id,
+              closeChannel: true,
+            });
+          });
           resolver.stream = recv;
           resolver.ch = chan;
           channel.closed.finally(() => {
