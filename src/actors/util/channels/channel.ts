@@ -246,7 +246,12 @@ export const makeWebSocket = <
     })();
   };
 
-  socket?.accept?.();
+  try {
+    // @ts-ignore-error: socket does not exists in deno implementation
+    socket?.accept?.();
+  } catch {
+    // ignore if not exists (Deno implementation)
+  }
   return promise;
 };
 
