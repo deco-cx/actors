@@ -27,7 +27,7 @@ import {
 /**
  * Represents a fetcher for actors.
  */
-export interface ActorFetcher<TEnv = unknown> {
+export interface ActorFetcher<TEnv extends object = object> {
   fetch: (request: Request, env?: TEnv) => Promise<Response> | Response;
 }
 
@@ -56,8 +56,12 @@ const parseActorInvokeApi = (pathname: string) => {
   return { actorName, methodName };
 };
 
-export type ActorConstructor<TInstance extends Actor = Actor> = new (
+export type ActorConstructor<
+  TInstance extends Actor = Actor,
+  Env extends object = object,
+> = new (
   state: ActorState,
+  env?: Env,
 ) => TInstance;
 
 export interface ActorInstance {
@@ -76,7 +80,8 @@ export type WebSocketUpgradeHandler = (
 /**
  * Represents the runtime for managing and invoking actors.
  */
-export class ActorRuntime implements ActorFetcher {
+export class ActorRuntime<TEnv extends object = object>
+  implements ActorFetcher<TEnv> {
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
   private silos: Map<string, ActorSilo> = new Map<string, ActorSilo>();
@@ -93,6 +98,7 @@ export class ActorRuntime implements ActorFetcher {
    */
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
+    protected env?: TEnv,
   ) {
     this.websocketHandler = typeof Deno === "object"
       ? Deno?.upgradeWebSocket
@@ -139,6 +145,7 @@ export class ActorRuntime implements ActorFetcher {
         actorId,
         this.getActorStorage.bind(this),
         discriminator,
+        this.env,
       );
       this.silos.set(actorId, silo);
     }

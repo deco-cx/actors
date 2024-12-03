@@ -24,7 +24,7 @@ const KNOWN_METHODS: Record<string, symbol> = {
 const isWellKnownRPCMethod = (methodName: string) =>
   methodName === WELL_KNOWN_RPC_MEHTOD;
 
-export class ActorSilo {
+export class ActorSilo<TEnv extends object = object> {
   private actors: Map<string, ActorInstance> = new Map<string, ActorInstance>();
   public invoker: ActorInvoker;
 
@@ -36,6 +36,7 @@ export class ActorSilo {
       actorName: string,
     ) => ActorStorage,
     private discriminator?: string,
+    private env?: TEnv,
   ) {
     this.invoker = {
       invoke: this.invoke.bind(this),
@@ -60,7 +61,7 @@ export class ActorSilo {
           return create(actor, invoker);
         },
       });
-      const actor = new Actor(state);
+      const actor = new Actor(state, this.env);
       this.actors.set(Actor.name, {
         actor,
         state,

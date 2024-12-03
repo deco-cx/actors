@@ -27,9 +27,9 @@ export class ActorDurableObject {
 
   constructor(
     state: DurableObjectState,
-    _env: Env,
+    env: Env,
   ) {
-    this.runtime = new ActorRuntime(REGISTERED_ACTORS);
+    this.runtime = new ActorRuntime(REGISTERED_ACTORS, env);
     if (WEBSOCKET_HANDLER) {
       this.runtime.setWebSocketHandler(WEBSOCKET_HANDLER);
     }
