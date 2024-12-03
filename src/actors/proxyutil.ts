@@ -314,7 +314,7 @@ export const createRPCInvoker = <
           it.return = (val) => {
             return retn?.call(it, val) ?? val;
           };
-          resolver.throw = it.throw;
+          resolver.throw = it.throw?.bind(it);
           resolver.response.resolve(
             it as TResponse,
           );
