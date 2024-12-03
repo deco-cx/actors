@@ -8,7 +8,8 @@ export interface Env {
   ACTOR_DO: DurableObjectNamespace;
 }
 
-export class ActorCfRuntime implements ActorFetcher<Env> {
+export class ActorCfRuntime<TEnvs extends object = object>
+  implements ActorFetcher<Env & TEnvs> {
   constructor(protected actorsConstructors: Array<ActorConstructor>) {
     registerActors(actorsConstructors, () => {
       const webSocketPair = new WebSocketPair();
