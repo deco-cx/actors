@@ -66,6 +66,7 @@ export class ActorAwaiter<
   DuplexChannel<any, any> {
   ch: Promise<TChannel> | null = null;
   ctrl: AbortController;
+  _disconnected: PromiseWithResolvers<void> = Promise.withResolvers();
   constructor(
     protected actorName: string,
     protected actorMethod: string,
@@ -138,6 +139,9 @@ export class ActorAwaiter<
       };
       await Promise.all([recvLoop(), sendLoop()]);
       if (ch.signal.aborted && !reliableCh.signal.aborted) {
+        const prev = this._disconnected;
+        this._disconnected = Promise.withResolvers();
+        prev.resolve();
         console.error("channel closed, retrying...");
         await new Promise((resolve) => setTimeout(resolve, 2e3)); // retrying in 2 second
         return nextConnection();
@@ -149,6 +153,10 @@ export class ActorAwaiter<
       console.error(`could not connect to websocket`, err);
     });
     return this.ch;
+  }
+
+  get disconnected() {
+    return this._disconnected.promise;
   }
 
   async send(value: unknown): Promise<void> {
@@ -312,12 +320,11 @@ export const createRPCInvoker = <
       const id = crypto.randomUUID();
       const response = Promise.withResolvers<TResponse>();
       pendingRequests.set(id, { response });
-      channel.closed.finally(() => {
-        const resolver = pendingRequests.get(id);
-        if (resolver) {
-          resolver.response.reject(new Error("Channel closed"));
-        }
-      });
+      const cleanup = () => {
+        response.reject(new Error("Channel closed"));
+      };
+      channel.closed.finally(cleanup);
+      channel.disconnected?.finally(cleanup);
 
       try {
         await channel.send({
