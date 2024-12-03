@@ -260,6 +260,7 @@ type RequestResolver<TResponse> = {
   response: PromiseWithResolvers<TResponse>;
   stream?: Channel<unknown>;
   ch?: DuplexChannel<unknown, unknown>;
+  throw?: (err: unknown) => void;
 };
 export const createRPCInvoker = <
   TResponse,
@@ -282,6 +283,7 @@ export const createRPCInvoker = <
       }
       if ("error" in response) {
         pendingRequests.delete(response.id);
+        let err;
         if (response.constructorName) {
           // Reconstruct the error if we have constructor information
           const errorData = JSON.parse(response.error as string);
@@ -290,10 +292,14 @@ export const createRPCInvoker = <
             errorData,
           );
           error.constructor = { name: response.constructorName };
-          resolver.response.reject(error);
+          err = error;
         } else {
-          resolver.response.reject(response.error);
+          err = response.error;
         }
+        resolver.response.reject(err);
+        resolver?.stream?.close();
+        resolver?.ch?.close();
+        resolver?.throw?.(err);
       } else if ("stream" in response) {
         if ("end" in response) {
           resolver.stream?.close();
@@ -305,6 +311,7 @@ export const createRPCInvoker = <
           it.return = (val) => {
             return retn?.call(it, val) ?? val;
           };
+          resolver.throw = it.throw;
           resolver.response.resolve(
             it as TResponse,
           );
