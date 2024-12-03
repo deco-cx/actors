@@ -281,7 +281,7 @@ export const createRPCInvoker = <
       if (!resolver) {
         continue;
       }
-      if ("error" in response) {
+      if ("error" in response && !("stream" in response)) {
         pendingRequests.delete(response.id);
         let err;
         if (response.constructorName) {
@@ -304,6 +304,9 @@ export const createRPCInvoker = <
         if ("end" in response) {
           resolver.stream?.close();
           pendingRequests.delete(response.id);
+          if ("error" in response && response.error) {
+            resolver?.throw?.(response.error);
+          }
         } else if ("start" in response) {
           resolver.stream = makeChan();
           const it = resolver.stream.recv(channel.signal);

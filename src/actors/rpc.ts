@@ -70,6 +70,7 @@ export interface InvokeResultResponseStreamStart extends InvokeResponseBase {
 export interface InvokeResultResponseStreamEnd extends InvokeResponseBase {
   stream: true;
   end: true;
+  error?: unknown;
 }
 
 export interface InvokeErrorResponse extends InvokeResponseBase {
@@ -86,6 +87,23 @@ export type InvokeResponse =
   | InvokeResultResponseStreamStart
   | InvokeResultResponseStream
   | InvokeResultResponseStreamEnd;
+
+const convertError = (error: unknown) => {
+  const constructorName = error?.constructor?.name;
+  if (constructorName) {
+    const serializedError = JSON.stringify(
+      error,
+      Object.getOwnPropertyNames(error),
+    );
+    return {
+      constructorName,
+      error: serializedError,
+    };
+  }
+  return {
+    error,
+  };
+};
 export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
   InvokeResponse,
   InvokeRequest
@@ -132,6 +150,7 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
         invoker.invoke(...invocation.invoke)
           .then(async (result) => {
             if (isEventStreamResponse(result)) {
+              let error: undefined | unknown;
               try {
                 streams.set(invocation.id, result);
                 await send({
@@ -146,11 +165,14 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
                     stream: true,
                   });
                 }
+              } catch (err) {
+                error = err;
               } finally {
                 await send({
                   id: invocation.id,
                   stream: true,
                   end: true,
+                  error: error ? convertError(error) : undefined,
                 });
                 streams.delete(invocation.id);
               }
@@ -193,20 +215,9 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
             });
           })
           .catch((error) => {
-            const constructorName = error?.constructor?.name;
-            if (constructorName) {
-              const serializedError = JSON.stringify(
-                error,
-                Object.getOwnPropertyNames(error),
-              );
-              return send({
-                constructorName,
-                error: serializedError,
-                id: invocation.id,
-              });
-            }
+            const payload = convertError(error);
             return send({
-              error,
+              ...payload,
               id: invocation.id,
             });
           }),
