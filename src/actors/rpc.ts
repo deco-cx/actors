@@ -18,7 +18,8 @@ export interface InvokeCancelStreamRequest {
 
 export interface InvokeCloseChannelRequest {
   id: string;
-  closeChannel: true;
+  channel: true;
+  close: true;
 }
 
 export interface InvokeActorRequest {
@@ -111,7 +112,7 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
         });
         continue;
       }
-      if ("closeChannel" in invocation) {
+      if ("channel" in invocation && "close" in invocation) {
         const channel = channels.get(invocation.id);
         if (channel) {
           channel.close();
