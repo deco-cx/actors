@@ -312,6 +312,12 @@ export const createRPCInvoker = <
       const id = crypto.randomUUID();
       const response = Promise.withResolvers<TResponse>();
       pendingRequests.set(id, { response });
+      channel.closed.finally(() => {
+        const resolver = pendingRequests.get(id);
+        if (resolver) {
+          resolver.response.reject(new Error("Channel closed"));
+        }
+      });
 
       try {
         await channel.send({
