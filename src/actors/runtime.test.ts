@@ -105,24 +105,23 @@ Deno.test("counter tests", async () => {
   const counterActor = counterProxy.id(actorId);
   using rpcActor = counterProxy.id("12345", "1234").rpc();
 
-  const name = `Counter Actor`;
-  const ch = counterActor.chan(name);
-  const it = ch.recv();
-  const { value, done } = await it.next();
-
-  assertFalse(done);
-  assertEquals(value, `Hello ${name}`);
-
-  await ch.send("PING");
-
-  const { value: pong, done: pongDone } = await it.next();
-
-  assertFalse(pongDone);
-  assertEquals(pong, "PONG");
-
-  await ch.close();
-
   for (const actor of [rpcActor, counterActor]) {
+    const name = `Counter Actor`;
+    const ch = actor.chan(name);
+    const it = ch.recv();
+    const { value, done } = await it.next();
+
+    assertFalse(done);
+    assertEquals(value, `Hello ${name}`);
+
+    await ch.send("PING");
+
+    const { value: pong, done: pongDone } = await it.next();
+
+    assertFalse(pongDone);
+    assertEquals(pong, "PONG");
+
+    await ch.close();
     const p = performance.now();
     const watcher = await actor.watch();
 

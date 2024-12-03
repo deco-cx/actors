@@ -256,6 +256,11 @@ const initServer = (): ActorsServer => {
   };
 };
 
+type RequestResolver<TResponse> = {
+  response: PromiseWithResolvers<TResponse>;
+  stream?: Channel<unknown>;
+  ch?: DuplexChannel<unknown, unknown>;
+};
 export const createRPCInvoker = <
   TResponse,
   TChannel extends DuplexChannel<unknown, unknown>,
@@ -265,61 +270,87 @@ export const createRPCInvoker = <
   // Map to store pending requests
   const pendingRequests = new Map<
     string,
-    { response: PromiseWithResolvers<TResponse>; stream?: Channel<unknown> }
+    RequestResolver<TResponse>
   >();
 
   // Start listening for responses
   (async () => {
     for await (const response of channel.recv()) {
       const resolver = pendingRequests.get(response.id);
-      if (resolver) {
-        if ("error" in response) {
-          pendingRequests.delete(response.id);
-          if (response.constructorName) {
-            // Reconstruct the error if we have constructor information
-            const errorData = JSON.parse(response.error as string);
-            const error = Object.assign(
-              new Error(),
-              errorData,
-            );
-            error.constructor = { name: response.constructorName };
-            resolver.response.reject(error);
-          } else {
-            resolver.response.reject(response.error);
-          }
-        } else if ("stream" in response) {
-          if ("end" in response) {
-            resolver.stream?.close();
-            pendingRequests.delete(response.id);
-          } else if ("start" in response) {
-            resolver.stream = makeChan();
-            const it = resolver.stream.recv(channel.signal);
-            const retn = it.return;
-            it.return = (val) => {
-              return retn?.call(it, val) ?? val;
-            };
-            resolver.response.resolve(
-              it as TResponse,
-            );
-          } else if (resolver.stream) {
-            resolver.stream.send(response.result);
-          }
+      if (!resolver) {
+        continue;
+      }
+      if ("error" in response) {
+        pendingRequests.delete(response.id);
+        if (response.constructorName) {
+          // Reconstruct the error if we have constructor information
+          const errorData = JSON.parse(response.error as string);
+          const error = Object.assign(
+            new Error(),
+            errorData,
+          );
+          error.constructor = { name: response.constructorName };
+          resolver.response.reject(error);
         } else {
-          resolver.response.resolve(response.result);
+          resolver.response.reject(response.error);
         }
+      } else if ("stream" in response) {
+        if ("end" in response) {
+          resolver.stream?.close();
+          pendingRequests.delete(response.id);
+        } else if ("start" in response) {
+          resolver.stream = makeChan();
+          const it = resolver.stream.recv(channel.signal);
+          const retn = it.return;
+          it.return = (val) => {
+            return retn?.call(it, val) ?? val;
+          };
+          resolver.response.resolve(
+            it as TResponse,
+          );
+        } else if (resolver.stream) {
+          resolver.stream.send(response.result);
+        }
+      } else if ("channel" in response) {
+        if ("close" in response) {
+          resolver.ch?.close();
+          pendingRequests.delete(response.id);
+        } else if ("opened" in response) {
+          const recv = makeChan();
+          const send = makeChan();
+          const chan = makeDuplexChannelWith(send, recv);
+          resolver.stream = recv;
+          resolver.ch = chan;
+          channel.closed.finally(() => {
+            pendingRequests.delete(response.id);
+            resolver.stream?.close();
+          });
+
+          resolver.response.resolve(chan as TResponse);
+          (async () => {
+            for await (const message of send.recv(channel.signal)) {
+              channel.send({
+                id: response.id,
+                channel: true,
+                message,
+              });
+            }
+          })();
+        } else if ("message" in response && resolver.stream) {
+          resolver.stream.send(response.message);
+        }
+      } else {
+        resolver.response.resolve(response.result);
       }
     }
   })();
 
   return {
     invoke: async (name, method, methodArgs, metadata, connect) => {
-      if (connect) {
-        throw new Error("Connect not supported in RPC invoker");
-      }
-
       const id = crypto.randomUUID();
       const response = Promise.withResolvers<TResponse>();
-      pendingRequests.set(id, { response });
+      const resolver: RequestResolver<TResponse> = { response };
+      pendingRequests.set(id, resolver);
       const cleanup = () => {
         response.reject(new Error("Channel closed"));
       };
