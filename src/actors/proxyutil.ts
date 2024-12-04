@@ -297,15 +297,15 @@ export const createRPCInvoker = <
           err = response.error;
         }
         resolver.response.reject(err);
-        resolver?.stream?.close();
-        resolver?.ch?.close();
-        resolver?.throw?.(err);
+        resolver.throw?.(err);
+        resolver.stream?.close();
+        resolver.ch?.close();
       } else if ("stream" in response) {
         if ("end" in response) {
           resolver.stream?.close();
           pendingRequests.delete(response.id);
           if ("error" in response && response.error) {
-            resolver?.throw?.(response.error);
+            resolver.throw?.(response.error);
           }
         } else if ("start" in response) {
           resolver.stream = makeChan();
@@ -370,7 +370,11 @@ export const createRPCInvoker = <
       const resolver: RequestResolver<TResponse> = { response };
       pendingRequests.set(id, resolver);
       const cleanup = () => {
-        response.reject(new Error("Channel closed"));
+        const channelClosed = new Error("Channel closed");
+        response.reject(channelClosed);
+        resolver.throw?.(channelClosed);
+        resolver.stream?.close();
+        resolver.ch?.close();
       };
       channel.closed.finally(cleanup);
       channel.disconnected?.finally(cleanup);
