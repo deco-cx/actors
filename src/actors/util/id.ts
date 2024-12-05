@@ -1,4 +1,4 @@
-import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "../stubutil.ts";
+import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "../proxyutil.ts";
 
 /**
  * Retrieves the actor ID from the request.

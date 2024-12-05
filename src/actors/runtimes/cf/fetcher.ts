@@ -1,6 +1,6 @@
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
+import { ACTOR_ID_HEADER_NAME } from "../../proxyutil.ts";
 import type { ActorConstructor, ActorFetcher } from "../../runtime.ts";
-import { ACTOR_ID_HEADER_NAME } from "../../stubutil.ts";
 import { actorId as getActorId } from "../../util/id.ts";
 import { registerActors } from "./actorDO.ts";
 
