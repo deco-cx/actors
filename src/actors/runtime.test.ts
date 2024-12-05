@@ -1,7 +1,7 @@
 import { assertEquals, assertFalse } from "jsr:@std/assert@^1.0.5";
-import { actors } from "./proxy.ts";
 import { ActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
+import { actors } from "./stub.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
@@ -32,7 +32,7 @@ class Counter {
   }
 
   callSayHello(): Promise<string> {
-    const hello = this.state.proxy(Hello).id(this.state.id);
+    const hello = this.state.stub(Hello).id(this.state.id);
     return hello.sayHello();
   }
 
@@ -59,7 +59,7 @@ class Counter {
   }
 
   async *readHelloChan(name: string): AsyncIterableIterator<string> {
-    const hello = this.state.proxy(Hello).id(this.state.id);
+    const hello = this.state.stub(Hello).id(this.state.id);
     using helloChan = hello.chan(name);
     for await (const event of helloChan.recv()) {
       yield event;
@@ -100,10 +100,10 @@ Deno.test("counter tests", async () => {
     reqCount++;
   });
   const actorId = "1234";
-  const counterProxy = actors.proxy(Counter);
+  const counterStub = actors.stub(Counter);
 
-  const counterActor = counterProxy.id(actorId);
-  using rpcActor = counterProxy.id("12345", "1234").rpc();
+  const counterActor = counterStub.id(actorId);
+  using rpcActor = counterStub.id("12345", "1234").rpc();
 
   for (const actor of [rpcActor, counterActor]) {
     const name = `Counter Actor`;

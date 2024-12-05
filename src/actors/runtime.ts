@@ -1,12 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import process from "node:process";
 import { ActorError } from "./errors.ts";
-import {
-  ACTOR_CONSTRUCTOR_NAME_HEADER,
-  ACTOR_DISCRIMINATOR_HEADER_NAME,
-  ACTOR_DISCRIMINATOR_QS_NAME,
-  ACTOR_ID_HEADER_NAME,
-} from "./proxyutil.ts";
 import { ActorSilo } from "./silo.ts";
 import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
@@ -16,6 +10,12 @@ import {
   EVENT_STREAM_RESPONSE_HEADER,
   isEventStreamResponse,
 } from "./stream.ts";
+import {
+  ACTOR_CONSTRUCTOR_NAME_HEADER,
+  ACTOR_DISCRIMINATOR_HEADER_NAME,
+  ACTOR_DISCRIMINATOR_QS_NAME,
+  ACTOR_ID_HEADER_NAME,
+} from "./stubutil.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
 import { actorId as getActorId } from "./util/id.ts";

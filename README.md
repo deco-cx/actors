@@ -59,7 +59,7 @@ class Counter {
 }
 
 // Invoking the counter actor
-const counter = actors.proxy(Counter).id("counter-id");
+const counter = actors.stub(Counter).id("counter-id");
 // Increment counter
 await counter.increment();
 // Get current count
