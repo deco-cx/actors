@@ -18,19 +18,23 @@ export interface ActorsOptions {
   actorIdHeaderName?: string;
   errorHandling?: Record<string, new (...args: any[]) => Error>;
 }
-const stub = <TInstance extends Actor>(
-  actor: ActorConstructor<TInstance> | string,
-  options?: ActorsOptions | undefined,
-): { id: StubFactory<TInstance> } => {
-  const factory = (id: string, discriminator?: string) =>
-    createHttpInvoker(id, discriminator, options);
-  return create(actor, factory);
-};
 
 /**
  * utilities to create and manage actors.
  */
 export const actors = {
-  proxy: stub,
-  stub,
+  proxy: <TInstance extends Actor>(
+    actor: ActorConstructor<TInstance> | string,
+    options?: ActorsOptions | undefined,
+  ): { id: StubFactory<TInstance> } => {
+    const factory = (id: string, discriminator?: string) =>
+      createHttpInvoker(id, discriminator, options);
+    return create(actor, factory);
+  },
+  stub: <TInstance extends Actor>(
+    actor: ActorConstructor<TInstance> | string,
+    options?: ActorsOptions | undefined,
+  ): { id: StubFactory<TInstance> } => {
+    return actors.proxy(actor, options);
+  },
 };
