@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
+import type { ActorInvoker } from "./proxyutil.ts";
 import { isEventStreamResponse } from "./stream.ts";
-import type { ActorInvoker } from "./stubutil.ts";
 import {
   type ChannelUpgrader,
   type DuplexChannel,

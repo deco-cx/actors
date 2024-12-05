@@ -3,8 +3,7 @@
   "exports": {
     ".": "./src/actors/mod.ts",
     "./hono": "./src/actors/hono/middleware.ts",
-    "./proxy": "./src/actors/stub.ts",
-    "./stub": "./src/actors/stub.ts",
+    "./proxy": "./src/actors/proxy.ts",
     "./watch": "./src/actors/util/watch.ts",
     "./server-run": "./src/actors/server/run.ts",
     "./server-gen": "./src/actors/server/gen.ts",

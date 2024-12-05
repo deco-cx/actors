@@ -1,9 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import process from "node:process";
+import type { ActorsOptions, ActorsServer } from "./proxy.ts";
 import type { InvokeRequest, InvokeResponse } from "./rpc.ts";
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
-import type { ActorsOptions, ActorsServer, ActorStub } from "./stub.ts";
 import {
   type Channel,
   type ChannelUpgrader,
@@ -20,10 +20,10 @@ export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
 export const ACTOR_DISCRIMINATOR_HEADER_NAME = "x-actor-discriminator";
 export const ACTOR_DISCRIMINATOR_QS_NAME = "actor_discriminator";
 
-export type StubFactory<TInstance> = (
+export type ProxyFactory<TInstance> = (
   id: string,
   discriminator?: string,
-) => ActorStub<TInstance>;
+) => ActorProxy<TInstance>;
 /**
  * Promise.prototype.then onfufilled callback type.
  */
@@ -200,8 +200,6 @@ export interface ProxyOptions<TInstance extends Actor> {
   server: string;
 }
 
-export type StubOptions<TInstance extends Actor> = ProxyOptions<TInstance>;
-
 export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
@@ -372,11 +370,9 @@ export const createRPCInvoker = <
       const resolver: RequestResolver<TResponse> = { response };
       pendingRequests.set(id, resolver);
       const cleanup = () => {
-        if (!pendingRequests.has(id)) {
-          return;
-        }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
+        resolver.throw?.(channelClosed);
         resolver.stream?.close();
         resolver.ch?.close();
       };
@@ -514,7 +510,7 @@ export const create = <TInstance extends Actor>(
   invokerFactory: (id: string, discriminator?: string) => ActorInvoker,
   metadata?: unknown,
   disposer?: () => void,
-): { id: StubFactory<TInstance> } => {
+): { id: ProxyFactory<TInstance> } => {
   const name = typeof actor === "string" ? actor : actor.name;
   return {
     id: (id: string, discriminator?: string): ActorProxy<TInstance> => {
