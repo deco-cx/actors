@@ -1,0 +1,36 @@
+// deno-lint-ignore-file no-explicit-any
+import type { Actor, ActorConstructor } from "./runtime.ts";
+import {
+  type ActorProxy,
+  create,
+  createHttpInvoker,
+  type StubFactory,
+} from "./stubutil.ts";
+export type { ActorProxy, ActorProxy as ActorStub };
+export interface ActorsServer {
+  url: string;
+  credentials?: RequestCredentials;
+  deploymentId?: string;
+}
+
+export interface ActorsOptions {
+  server?: ActorsServer;
+  actorIdHeaderName?: string;
+  errorHandling?: Record<string, new (...args: any[]) => Error>;
+}
+const stub = <TInstance extends Actor>(
+  actor: ActorConstructor<TInstance> | string,
+  options?: ActorsOptions | undefined,
+): { id: StubFactory<TInstance> } => {
+  const factory = (id: string, discriminator?: string) =>
+    createHttpInvoker(id, discriminator, options);
+  return create(actor, factory);
+};
+
+/**
+ * utilities to create and manage actors.
+ */
+export const actors = {
+  proxy: stub,
+  stub,
+};

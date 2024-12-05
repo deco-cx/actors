@@ -1,14 +1,14 @@
 import { ActorError } from "./errors.ts";
+import { rpc } from "./rpc.ts";
+import type { ActorConstructor, ActorInstance } from "./runtime.ts";
+import { ActorState } from "./state.ts";
+import type { ActorStorage } from "./storage.ts";
 import {
   type ActorInvoker,
   create,
   createHttpInvoker,
   WELL_KNOWN_RPC_MEHTOD,
-} from "./proxyutil.ts";
-import { rpc } from "./rpc.ts";
-import type { ActorConstructor, ActorInstance } from "./runtime.ts";
-import { ActorState } from "./state.ts";
-import type { ActorStorage } from "./storage.ts";
+} from "./stubutil.ts";
 import { isUpgrade, makeDuplexChannel } from "./util/channels/channel.ts";
 // deno-lint-ignore no-explicit-any
 type FunctionType = (...args: any) => any;
@@ -51,7 +51,7 @@ export class ActorSilo<TEnv extends object = object> {
         id: this.actorId,
         discriminator: this.discriminator,
         storage,
-        proxy: (actor) => {
+        stub: (actor) => {
           const invoker = (id: string) => {
             if (id === this.actorId) {
               return this.invoker;
@@ -105,7 +105,7 @@ export class ActorSilo<TEnv extends object = object> {
       );
     }
 
-    const actorProxy = new Proxy(actorInstance.actor, {
+    const actorStub = new Proxy(actorInstance.actor, {
       get(target, prop, receiver) {
         if (prop === "metadata") {
           return metadata;
@@ -116,7 +116,7 @@ export class ActorSilo<TEnv extends object = object> {
 
     // deno-lint-ignore ban-types
     const result = await (methodImpl as Function).apply(
-      actorProxy,
+      actorStub,
       Array.isArray(args) ? args : [args],
     );
 
