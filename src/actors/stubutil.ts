@@ -220,8 +220,7 @@ export type ActorProxy<Actor> =
       withMetadata(metadata: TMetadata): ActorProxy<Actor>;
       rpc(): ActorProxy<Actor> & Disposable;
     }
-    // deno-lint-ignore ban-types
-    : {});
+    : { rpc(): ActorProxy<Actor> & Disposable });
 
 const urlFor = (
   serverUrl: string,
