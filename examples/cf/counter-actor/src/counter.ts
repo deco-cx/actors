@@ -27,6 +27,14 @@ export class Counter {
     return this.count;
   }
 
+  alarm() {
+    console.log("HELLO");
+  }
+
+  schedule() {
+    this.state.storage.setAlarm(new Date().getTime() + 5000);
+  }
+
   getCount(): number {
     return this.count + (this.metadata?.extraSum ?? 0);
   }

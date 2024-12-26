@@ -24,6 +24,16 @@ export class S3ActorStorage implements ActorStorage {
     this.region = process.env.AWS_REGION! ?? "us-east-1";
   }
 
+  setAlarm(_dt: number): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+  getAlarm(): Promise<number | null> {
+    throw new Error("Method not implemented.");
+  }
+  deleteAlarm(): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+
   // Build the full key based on actor name, id, and provided key
   buildKey(key: string[]): string {
     return [this.options.actorName, this.options.actorId, ...key].join("/");

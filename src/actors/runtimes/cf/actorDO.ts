@@ -6,6 +6,7 @@ import {
   type WebSocketUpgradeHandler,
 } from "../../runtime.ts";
 import { DurableObjectActorStorage } from "../../storage/cf.ts";
+import { AlarmsManager } from "./alarms.ts";
 import type { Env } from "./fetcher.ts";
 
 let REGISTERED_ACTORS: ActorConstructor[] = [];
@@ -24,6 +25,7 @@ export function registerActors(
 
 export class ActorDurableObject {
   private runtime: ActorRuntime;
+  private alarms: AlarmsManager;
 
   constructor(
     state: DurableObjectState,
@@ -33,9 +35,15 @@ export class ActorDurableObject {
     if (WEBSOCKET_HANDLER) {
       this.runtime.setWebSocketHandler(WEBSOCKET_HANDLER);
     }
-    this.runtime.setDefaultActorStorage((options) =>
-      new DurableObjectActorStorage(state.storage, options)
+    this.alarms = new AlarmsManager(state, this.runtime);
+    this.runtime.setDefaultActorStorage(
+      (options) =>
+        new DurableObjectActorStorage(state.storage, options, this.alarms),
     );
+  }
+
+  alarm(): Promise<void> {
+    return this.alarms.alarm();
   }
 
   fetch(request: Request): Promise<Response> | Response {
