@@ -1,4 +1,5 @@
 import type { DurableObjectStorage } from "@cloudflare/workers-types";
+import { ActorDOId } from "../runtimes/cf/fetcher.ts";
 import type {
   ActorStorage,
   ActorStorageGetOptions,
@@ -6,14 +7,58 @@ import type {
   ActorStoragePutOptions,
 } from "../storage.ts";
 
-export class DurableObjectActorStorage implements ActorStorage {
+export const WELL_KNOWN_DO_NAME_KEY = "DURABLE_OBJECT_NAME";
+
+export class DurableObjectNameStorage {
   constructor(
     private storage: DurableObjectStorage | DurableObjectTransaction,
     private options: {
       actorName: string;
       actorId: string;
     },
-  ) {}
+  ) {
+  }
+
+  static get(st: DurableObjectStorage | DurableObjectTransaction) {
+    return st.get(WELL_KNOWN_DO_NAME_KEY);
+  }
+
+  async saveOnce() {
+    const name = await DurableObjectNameStorage.get(this.storage);
+    if (name) return;
+
+    return this.storage.put(
+      WELL_KNOWN_DO_NAME_KEY,
+      ActorDOId.build({
+        name: this.options.actorName,
+        id: this.options.actorId,
+      }),
+    );
+  }
+}
+
+export class DurableObjectActorStorage implements ActorStorage {
+  private nameStorage: DurableObjectNameStorage;
+  constructor(
+    private storage: DurableObjectStorage | DurableObjectTransaction,
+    private options: {
+      actorName: string;
+      actorId: string;
+    },
+  ) {
+    this.nameStorage = new DurableObjectNameStorage(storage, options);
+  }
+
+  async setAlarm(dt: number): Promise<void> {
+    await this.nameStorage.saveOnce();
+    return this.storage.setAlarm(dt);
+  }
+  getAlarm(): Promise<number | null> {
+    return this.storage.getAlarm();
+  }
+  deleteAlarm(): Promise<void> {
+    return this.storage.deleteAlarm();
+  }
 
   private buildKey(key: string[] | string[][]): string {
     return `${this.options.actorName}:${this.options.actorId}:${

@@ -36,6 +36,14 @@ class Counter {
     return hello.sayHello();
   }
 
+  alarm() {
+    console.log("HELLO");
+  }
+
+  schedule() {
+    this.state.storage.setAlarm(new Date().getTime() + 5000);
+  }
+
   async increment(): Promise<number> {
     this.count++;
     await this.state.storage.put("counter", this.count);

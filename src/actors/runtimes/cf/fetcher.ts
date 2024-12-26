@@ -1,12 +1,23 @@
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 import type { ActorConstructor, ActorFetcher } from "../../runtime.ts";
 import { ACTOR_ID_HEADER_NAME } from "../../stubutil.ts";
-import { actorId as getActorId } from "../../util/id.ts";
+import { type ActorLocator, locateActor } from "../../util/id.ts";
 import { registerActors } from "./actorDO.ts";
 
 export interface Env {
   ACTOR_DO: DurableObjectNamespace;
 }
+const SEPARATOR = "|#SEP#|";
+export const ActorDOId = {
+  build: (locator: ActorLocator) =>
+    [locator.id, locator.name].filter((part) => part).join(
+      SEPARATOR,
+    ),
+  unwind: (id: string): Omit<ActorLocator, "method"> => {
+    const [id_, name] = id.split(SEPARATOR);
+    return { id: id_, name };
+  },
+};
 
 export class ActorCfRuntime<TEnvs extends object = object>
   implements ActorFetcher<Env & TEnvs> {
@@ -33,15 +44,16 @@ export class ActorCfRuntime<TEnvs extends object = object>
     if (!env) {
       return new Response("Missing env", { status: 500 });
     }
-    const actorId = getActorId(request);
+    const locator: ActorLocator | { id: undefined } = locateActor(request) ??
+      { id: undefined };
 
-    if (!actorId) {
+    if (!locator?.id) {
       return new Response(`Missing ${ACTOR_ID_HEADER_NAME}`, {
         status: 400,
       });
     }
 
-    const id = env.ACTOR_DO.idFromName(actorId);
+    const id = env.ACTOR_DO.idFromName(ActorDOId.build(locator));
     const durableObject = env.ACTOR_DO.get(id);
 
     return durableObject.fetch(request);

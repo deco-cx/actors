@@ -18,7 +18,7 @@ import {
 } from "./stubutil.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
-import { actorId as getActorId } from "./util/id.ts";
+import { locateActor as getActorId } from "./util/id.ts";
 import {
   type ServerSentEventMessage,
   ServerSentEventStream,
@@ -36,25 +36,6 @@ export interface ActorFetcher<TEnv extends object = object> {
  */
 // deno-lint-ignore no-empty-interface
 export interface Actor {}
-
-const ACTORS_API_SEGMENT = "actors";
-const ACTORS_INVOKE_API_SEGMENT = "invoke";
-
-const parseActorInvokeApi = (pathname: string) => {
-  if (!pathname) {
-    return null;
-  }
-  const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const [_, actorsApiSegment, actorName, invokeApiSegment, methodName] =
-    normalized.split("/");
-  if (
-    actorsApiSegment !== ACTORS_API_SEGMENT ||
-    invokeApiSegment !== ACTORS_INVOKE_API_SEGMENT
-  ) {
-    return null;
-  }
-  return { actorName, methodName };
-};
 
 export type ActorConstructor<
   TInstance extends Actor = Actor,
@@ -177,7 +158,9 @@ export class ActorRuntime<TEnv extends object = object>
    */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const actorId = getActorId(url, req);
+    const { id: actorId, name: actorName, method: methodName } =
+      getActorId(url, req) ?? {};
+
     if (!actorId) {
       return new Response(`missing ${ACTOR_ID_HEADER_NAME} header`, {
         status: 400,
@@ -189,11 +172,7 @@ export class ActorRuntime<TEnv extends object = object>
       this.actorDiscriminator(url, req) || undefined,
     );
 
-    const result = parseActorInvokeApi(url.pathname);
-    if (!result) {
-      return new Response(null, { status: 404 });
-    }
-    const { actorName, methodName } = result;
+
     if (!methodName || !actorName) {
       return new Response(
         `method ${methodName} not found for the actor ${actorName}`,
