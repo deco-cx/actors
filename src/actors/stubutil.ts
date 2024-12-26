@@ -14,7 +14,6 @@ import {
 } from "./util/channels/channel.ts";
 import { retry } from "./util/retry.ts";
 
-export const ACTOR_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
 export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
@@ -427,16 +426,12 @@ export const createHttpInvoker = <
           discriminator
             ? `&${ACTOR_DISCRIMINATOR_QS_NAME}=${discriminator}`
             : ""
-        }${
-          options?.maxWsChunkSize
-            ? `&${ACTOR_MAX_CHUNK_SIZE_QS_NAME}=${options.maxWsChunkSize}`
-            : ""
         }`);
         url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
         const ws = new WebSocket(
           url,
         );
-        return makeWebSocket(ws, options?.maxWsChunkSize) as Promise<TChannel>;
+        return makeWebSocket(ws) as Promise<TChannel>;
       }
       const abortCtrl = new AbortController();
       const resp = await fetch(

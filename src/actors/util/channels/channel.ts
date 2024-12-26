@@ -1,10 +1,4 @@
 // deno-lint-ignore-file no-explicit-any
-import {
-  type ChunkBuffer,
-  createChunk,
-  createInitialChunkMessage,
-  processChunk,
-} from "./chunked.ts";
 import { Queue } from "./queue.ts";
 import { jsonSerializer } from "./serializers.ts";
 
@@ -196,20 +190,20 @@ export interface MessageSerializer<
 export const makeWebSocket = <
   TSend,
   TReceive,
+  TMessageFormat extends string | ArrayBufferLike | ArrayBufferView | Blob,
 >(
   socket: WebSocket,
-  maxChunkSize?: number,
+  _serializer?: MessageSerializer<TSend, TReceive, TMessageFormat>,
 ): Promise<DuplexChannel<Message<TSend>, Message<TReceive>>> => {
-  const serializer = jsonSerializer<Message<TSend>, Message<TReceive>>();
+  const serializer = _serializer ??
+    jsonSerializer<Message<TSend>, Message<TReceive>>();
   const sendChan = makeChan<Message<TSend>>();
   const recvChan = makeChan<Message<TReceive>>();
   const { promise, resolve, reject } = Promise.withResolvers<
     DuplexChannel<Message<TSend>, Message<TReceive>>
   >();
 
-  const messageBuffers = new Map<string, ChunkBuffer>();
-
-  socket.binaryType = maxChunkSize ? "arraybuffer" : "blob";
+  socket.binaryType = serializer.binaryType ?? "blob";
 
   const cleanup = () => {
     sendChan.close();
@@ -224,49 +218,7 @@ export const makeWebSocket = <
 
   socket.onmessage = (msg) => {
     if (!recvChan.signal.aborted) {
-      if (msg.data instanceof ArrayBuffer) {
-        const chunk = processChunk(msg.data);
-
-        if (chunk.isInitial) {
-          messageBuffers.set(chunk.messageId, {
-            chunks: new Array(chunk.totalChunks!),
-            receivedChunks: 0,
-            totalChunks: chunk.totalChunks!,
-            totalSize: chunk.totalSize!,
-          });
-        } else {
-          const buffer = messageBuffers.get(chunk.messageId);
-          if (!buffer) {
-            console.error(
-              "Received chunk for unknown message:",
-              chunk.messageId,
-            );
-            return;
-          }
-
-          buffer.chunks[chunk.chunkIndex!] = chunk.data!;
-          buffer.receivedChunks++;
-
-          if (buffer.receivedChunks === buffer.totalChunks) {
-            try {
-              const completeData = new Uint8Array(buffer.totalSize);
-              let offset = 0;
-              for (const chunkData of buffer.chunks) {
-                completeData.set(chunkData, offset);
-                offset += chunkData.length;
-              }
-
-              const messageStr = new TextDecoder().decode(completeData);
-              const message = serializer.deserialize(messageStr);
-              recvChan.send(message);
-            } finally {
-              messageBuffers.delete(chunk.messageId);
-            }
-          }
-        }
-      } else {
-        recvChan.send(serializer.deserialize(msg.data)).catch(console.error);
-      }
+      recvChan.send(serializer.deserialize(msg.data)).catch(console.error);
     }
   };
 
@@ -285,32 +237,7 @@ export const makeWebSocket = <
     (async () => {
       try {
         for await (const message of sendChan.recv()) {
-          const serialized = serializer.serialize(message);
-
-          if (maxChunkSize && serialized.length > maxChunkSize) {
-            const messageId = crypto.randomUUID();
-            const data = new TextEncoder().encode(serialized);
-            const totalChunks = Math.ceil(data.length / maxChunkSize);
-
-            // Send initial message with metadata
-            const initialMessage = createInitialChunkMessage(
-              messageId,
-              totalChunks,
-              data.length,
-            );
-            socket.send(initialMessage);
-
-            // Send chunks
-            for (let i = 0; i < totalChunks; i++) {
-              const start = i * maxChunkSize;
-              const end = Math.min(start + maxChunkSize, data.length);
-              const chunkData = data.slice(start, end);
-              const chunk = createChunk(messageId, i, chunkData);
-              socket.send(chunk);
-            }
-          } else {
-            socket.send(serialized);
-          }
+          socket.send(serializer.serialize(message));
         }
       } catch (err) {
         console.error("Error in send loop:", err);

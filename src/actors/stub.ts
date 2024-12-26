@@ -17,7 +17,6 @@ export interface ActorsOptions {
   server?: ActorsServer;
   actorIdHeaderName?: string;
   errorHandling?: Record<string, new (...args: any[]) => Error>;
-  maxWsChunkSize?: number;
 }
 
 /**
