@@ -1,5 +1,6 @@
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import type { ActorStorage } from "./storage.ts";
+import type { ActorsOptions } from "./stub.ts";
 import type { create } from "./stubutil.ts";
 
 export interface ActorStateOptions {
@@ -8,6 +9,7 @@ export interface ActorStateOptions {
   storage: ActorStorage;
   stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
+    options?: ActorsOptions,
   ) => ReturnType<typeof create<TInstance>>;
 }
 /**
@@ -19,6 +21,7 @@ export class ActorState {
   public storage: ActorStorage;
   public stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
+    options?: ActorsOptions,
   ) => ReturnType<typeof create<TInstance>>;
   public initialization: Promise<void> = Promise.resolve();
   constructor(options: ActorStateOptions) {
