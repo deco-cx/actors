@@ -51,6 +51,15 @@ export class DenoKvActorStorage implements ActorStorage {
     this.kvOrTransaction = options.atomicOp?.kv ?? kv;
     this.atomicOp = options.atomicOp;
   }
+  setAlarm(_dt: number): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+  getAlarm(): Promise<number | null> {
+    throw new Error("Method not implemented.");
+  }
+  deleteAlarm(): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
 
   async atomic(_storage: (st: ActorStorage) => Promise<void>): Promise<void> {
     if (this.atomicOp) {

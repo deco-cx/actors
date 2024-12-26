@@ -9,11 +9,26 @@ import { RwLock } from "../util/rwlock.ts";
 
 export class CachedStorage implements ActorStorage {
   protected rwLock = new RwLock();
-
+  protected alarm: Promise<number | null> | null = null;
   constructor(
     protected innerStorage: ActorStorage,
     protected cache = new Map<string, any>(),
   ) {}
+
+  setAlarm(dt: number): Promise<void> {
+    return this.innerStorage.setAlarm(dt).then(() => {
+      this.alarm = Promise.resolve(dt);
+    });
+  }
+  getAlarm(): Promise<number | null> {
+    this.alarm ??= this.innerStorage.getAlarm();
+    return this.alarm;
+  }
+  deleteAlarm(): Promise<void> {
+    return this.innerStorage.deleteAlarm().then(() => {
+      this.alarm = null;
+    });
+  }
 
   private async getMany<T = unknown>(
     keys: string[][],

@@ -37,8 +37,8 @@ export interface ActorFetcher<TEnv extends object = object> {
 // deno-lint-ignore no-empty-interface
 export interface Actor {}
 
-const ACTORS_API_SEGMENT = "actors";
-const ACTORS_INVOKE_API_SEGMENT = "invoke";
+export const ACTORS_API_SEGMENT = "actors";
+export const ACTORS_INVOKE_API_SEGMENT = "invoke";
 
 const parseActorInvokeApi = (pathname: string) => {
   if (!pathname) {
