@@ -15,6 +15,7 @@ import {
   ACTOR_DISCRIMINATOR_HEADER_NAME,
   ACTOR_DISCRIMINATOR_QS_NAME,
   ACTOR_ID_HEADER_NAME,
+  ACTOR_MAX_CHUNK_SIZE_QS_NAME,
 } from "./stubutil.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
@@ -227,9 +228,11 @@ export class ActorRuntime<TEnv extends object = object>
           return new Response("WebSockets are not supported", { status: 400 });
         }
         const { socket, response } = await this.websocketHandler(req);
-        makeWebSocket(socket).then((ch) => res(ch)).finally(() =>
-          socket.close()
-        );
+        const chunkSize = url.searchParams.get(ACTOR_MAX_CHUNK_SIZE_QS_NAME);
+        makeWebSocket(
+          socket,
+          typeof chunkSize === "string" ? +chunkSize : undefined,
+        ).then((ch) => res(ch)).finally(() => socket.close());
         return response;
       }
       if (isEventStreamResponse(res)) {

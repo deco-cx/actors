@@ -51,12 +51,12 @@ export class ActorSilo<TEnv extends object = object> {
         id: this.actorId,
         discriminator: this.discriminator,
         storage,
-        stub: (actor) => {
-          const invoker = (id: string) => {
+        stub: (actor, options) => {
+          const invoker = (id: string, discriminator?: string) => {
             if (id === this.actorId) {
               return this.invoker;
             }
-            return createHttpInvoker(id);
+            return createHttpInvoker(id, discriminator, options);
           };
           return create(actor, invoker);
         },
