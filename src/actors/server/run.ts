@@ -5,7 +5,7 @@
 import * as fs from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
-import { type ActorConstructor, ActorRuntime } from "../runtime.ts";
+import { type ActorConstructor, StdActorRuntime } from "../runtime.ts";
 if (import.meta.main) {
   const actorsFolder = process.argv[0] ?? join(process.cwd(), "actors");
   const actors: ActorConstructor[] = [];
@@ -23,7 +23,7 @@ if (import.meta.main) {
       }
     }
   }
-  const runtime = new ActorRuntime(actors);
+  const runtime = new StdActorRuntime(actors);
 
   typeof Deno !== "undefined" && Deno.serve(runtime);
 }

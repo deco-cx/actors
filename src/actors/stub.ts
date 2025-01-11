@@ -13,11 +13,17 @@ export interface ActorsServer {
   deploymentId?: string;
 }
 
+export interface ActorFetcher {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  createWebSocket: (url: string | URL) => WebSocket;
+}
+
 export interface ActorsOptions {
   server?: ActorsServer;
   actorIdHeaderName?: string;
   errorHandling?: Record<string, new (...args: any[]) => Error>;
   maxWsChunkSize?: number;
+  fetcher?: ActorFetcher;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { assertEquals, assertFalse } from "jsr:@std/assert@^1.0.5";
-import { ActorRuntime } from "./runtime.ts";
+import { StdActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 import { actors } from "./stub.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
@@ -79,7 +79,7 @@ class Counter {
 }
 
 const runServer = (
-  rt: ActorRuntime,
+  rt: StdActorRuntime,
   onReq?: (req: Request) => void,
 ): AsyncDisposable => {
   const server = Deno.serve((req) => {
@@ -94,7 +94,7 @@ const runServer = (
 };
 
 Deno.test("counter tests", async () => {
-  const rt = new ActorRuntime([Counter, Hello]);
+  const rt = new StdActorRuntime([Counter, Hello]);
   let reqCount = 0;
   await using _server = runServer(rt, () => {
     reqCount++;

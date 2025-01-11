@@ -433,13 +433,16 @@ export const createHttpInvoker = <
             : ""
         }`);
         url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
-        const ws = new WebSocket(
+        const newWS = options?.fetcher?.createWebSocket ??
+          ((url: URL | string) => new WebSocket(url));
+        const ws = newWS(
           url,
         );
         return makeWebSocket(ws, options?.maxWsChunkSize) as Promise<TChannel>;
       }
       const abortCtrl = new AbortController();
-      const resp = await fetch(
+      const fetcher = options?.fetcher?.fetch ?? fetch;
+      const resp = await fetcher(
         endpoint,
         {
           method: "POST",

@@ -1,13 +1,13 @@
 import type { MiddlewareHandler } from "@hono/hono";
 import process from "node:process";
-import type { ActorFetcher } from "../runtime.ts";
+import type { ActorRuntime } from "../runtime.ts";
 
 /**
  * Adds middleware to the Hono server that routes requests to actors.
  * the default base path is `/actors`.
  */
 export const withActors = <TEnv extends object = object>(
-  fetcher: ActorFetcher<TEnv>,
+  fetcher: ActorRuntime<TEnv>,
   basePath = "/actors",
 ): MiddlewareHandler<{ Bindings: TEnv }> => {
   return async (ctx, next) => {

@@ -2,7 +2,7 @@
 import type { DurableObjectState } from "@cloudflare/workers-types";
 import {
   type ActorConstructor,
-  ActorRuntime,
+  StdActorRuntime,
   type WebSocketUpgradeHandler,
 } from "../../runtime.ts";
 import { DurableObjectActorStorage } from "../../storage/cf.ts";
@@ -24,14 +24,14 @@ export function registerActors(
 }
 
 export class ActorDurableObject {
-  private runtime: ActorRuntime;
+  private runtime: StdActorRuntime;
   private alarms: AlarmsManager;
 
   constructor(
     state: DurableObjectState,
     env: Env,
   ) {
-    this.runtime = new ActorRuntime(REGISTERED_ACTORS, env);
+    this.runtime = new StdActorRuntime(REGISTERED_ACTORS, env);
     if (WEBSOCKET_HANDLER) {
       this.runtime.setWebSocketHandler(WEBSOCKET_HANDLER);
     }
