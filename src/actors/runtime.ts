@@ -10,6 +10,7 @@ import {
   EVENT_STREAM_RESPONSE_HEADER,
   isEventStreamResponse,
 } from "./stream.ts";
+import type { ActorFetcher } from "./stub.ts";
 import {
   ACTOR_CONSTRUCTOR_NAME_HEADER,
   ACTOR_DISCRIMINATOR_HEADER_NAME,
@@ -28,8 +29,9 @@ import {
 /**
  * Represents a fetcher for actors.
  */
-export interface ActorFetcher<TEnv extends object = object> {
+export interface ActorRuntime<TEnv extends object = object> {
   fetch: (request: Request, env?: TEnv) => Promise<Response> | Response;
+  fetcher?: (env?: TEnv) => ActorFetcher;
 }
 
 /**
@@ -81,8 +83,8 @@ export type WebSocketUpgradeHandler = (
 /**
  * Represents the runtime for managing and invoking actors.
  */
-export class ActorRuntime<TEnv extends object = object>
-  implements ActorFetcher<TEnv> {
+export class StdActorRuntime<TEnv extends object = object>
+  implements ActorRuntime<TEnv> {
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
   private silos: Map<string, ActorSilo> = new Map<string, ActorSilo>();

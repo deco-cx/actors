@@ -1,4 +1,4 @@
-import type { ActorRuntime } from "../../mod.ts";
+import type { StdActorRuntime } from "../../mod.ts";
 import {
   ACTORS_API_SEGMENT,
   ACTORS_INVOKE_API_SEGMENT,
@@ -15,7 +15,7 @@ export class AlarmsManager {
   private storage: DurableObjectStorage;
   private readonly ALARMS_KEY = "actor_alarms";
 
-  constructor(state: DurableObjectState, protected runtime: ActorRuntime) {
+  constructor(state: DurableObjectState, protected runtime: StdActorRuntime) {
     this.storage = state.storage;
   }
 
