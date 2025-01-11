@@ -21,7 +21,11 @@ export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
 export const ACTOR_DISCRIMINATOR_HEADER_NAME = "x-actor-discriminator";
 export const ACTOR_DISCRIMINATOR_QS_NAME = "actor_discriminator";
 
-export type StubFactory<TInstance> = (
+export type StubFactory<TInstance> = {
+  id: StubFactoryFn<TInstance>;
+};
+
+export type StubFactoryFn<TInstance> = (
   id: string,
   discriminator?: string,
 ) => ActorStub<TInstance>;
@@ -521,7 +525,7 @@ export const create = <TInstance extends Actor>(
   invokerFactory: (id: string, discriminator?: string) => ActorInvoker,
   metadata?: unknown,
   disposer?: () => void,
-): { id: StubFactory<TInstance> } => {
+): StubFactory<TInstance> => {
   const name = typeof actor === "string" ? actor : actor.name;
   return {
     id: (id: string, discriminator?: string): ActorProxy<TInstance> => {

@@ -37,7 +37,7 @@ export class ActorCfRuntime<
   public stub<
     Constructor extends TActors[number] & ActorConstructor,
     TInstance extends InstanceType<Constructor>,
-  >(c: Constructor | string, env: Env): { id: StubFactory<TInstance> } {
+  >(c: Constructor | string, env: Env): StubFactory<TInstance> {
     return actors.stub<TInstance>(
       c as unknown as ActorConstructor<TInstance>,
       {

@@ -33,7 +33,7 @@ export const actors = {
   proxy: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance> | string,
     options?: ActorsOptions | undefined,
-  ): { id: StubFactory<TInstance> } => {
+  ): StubFactory<TInstance> => {
     const factory = (id: string, discriminator?: string) =>
       createHttpInvoker(id, discriminator, options);
     return create(actor, factory);
@@ -41,7 +41,7 @@ export const actors = {
   stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance> | string,
     options?: ActorsOptions | undefined,
-  ): { id: StubFactory<TInstance> } => {
+  ): StubFactory<TInstance> => {
     return actors.proxy(actor, options);
   },
 };
