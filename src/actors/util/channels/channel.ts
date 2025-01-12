@@ -128,7 +128,7 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
     const linked = signal ? link(ctrl.signal, signal) : ctrl.signal;
 
     try {
-      while (!linked.aborted) {
+      while (!linked.aborted || queue.size > 0) {
         const next = await queue.pop({ signal: linked });
         next.resolve();
         yield next.value;
