@@ -9,6 +9,78 @@ import { Queue } from "./queue.ts";
 import { jsonSerializer } from "./serializers.ts";
 
 /**
+ * Represents a broadcast channel.
+ * A single channel that allows subscriptions and broadcasts.
+ */
+export class Broadcaster<T> implements Channel<T> {
+  private subscribers: Map<string, Channel<T>> = new Map();
+  private ctrl = new AbortController();
+  private closePromise: Promise<void>;
+
+  constructor() {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    this.closePromise = promise;
+    this.ctrl.signal.addEventListener("abort", () => {
+      resolve();
+    }, { once: true });
+  }
+
+  get closed(): Promise<void> {
+    return this.closePromise;
+  }
+
+  get signal(): AbortSignal {
+    return this.ctrl.signal;
+  }
+
+  subscribe(signal?: AbortSignal): AsyncIterableIterator<T> {
+    const sessionId = crypto.randomUUID();
+    const channel = makeChan<T>();
+    this.subscribers.set(sessionId, channel);
+
+    // Remove the channel when it's closed
+    channel.closed.then(() => {
+      this.subscribers.delete(sessionId);
+    });
+
+    const iterator = channel.recv(signal);
+    const originalReturn = iterator.return;
+
+    iterator.return = function (value) {
+      channel.close();
+      return originalReturn?.call(iterator, value) ??
+        Promise.resolve({ value: undefined, done: true });
+    };
+
+    return iterator;
+  }
+
+  notify(value: T): void {
+    if (this.ctrl.signal.aborted) throw ClosedChannelError.instance;
+
+    // Send to all subscribers using their sessionId
+    this.subscribers.forEach((channel) =>
+      channel.send(value).catch(ignoreIfClosed)
+    );
+  }
+
+  send(value: T): Promise<void> {
+    this.notify(value);
+    return Promise.resolve();
+  }
+
+  async *recv(signal?: AbortSignal): AsyncIterableIterator<T> {
+    yield* this.subscribe(signal);
+  }
+
+  close(): void {
+    this.ctrl.abort();
+    this.subscribers.forEach((channel) => channel.close());
+    this.subscribers.clear();
+  }
+}
+
+/**
  * Represents a channel for asynchronous communication.
  */
 export interface Channel<T> {
