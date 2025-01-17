@@ -4,6 +4,7 @@ import type { ActorInvoker } from "./stubutil.ts";
 import {
   type ChannelUpgrader,
   type DuplexChannel,
+  ignoreIfClosed,
   isChannel,
 } from "./util/channels/channel.ts";
 
@@ -108,76 +109,93 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
   InvokeResponse,
   InvokeRequest
 > => {
-  return async ({ send, recv }) => {
+  return async ({ send, recv, signal }) => {
     const promises: Promise<void>[] = [];
     const streams: Map<string, AsyncIterableIterator<any>> = new Map();
     const channels: Map<string, DuplexChannel<any, any>> = new Map();
 
-    for await (const invocation of recv()) {
-      if ("channel" in invocation && "message" in invocation) {
-        const channel = channels.get(invocation.id);
-        if (!channel) {
-          await send({ id: invocation.id, channel: true, close: true });
+    try {
+      for await (const invocation of recv()) {
+        if (signal.aborted) break;
+
+        if ("channel" in invocation && "message" in invocation) {
+          const channel = channels.get(invocation.id);
+          if (!channel || channel.signal.aborted) {
+            channels.delete(invocation.id);
+            await send({ id: invocation.id, channel: true, close: true })
+              .catch(ignoreIfClosed);
+            continue;
+          }
+          await channel.send(invocation.message)
+            .catch(async (err) => {
+              console.error("error sending message through channel", err);
+              channel.close();
+              channels.delete(invocation.id);
+              await send({ id: invocation.id, channel: true, close: true })
+                .catch(ignoreIfClosed);
+            });
           continue;
         }
-        if (channel.signal.aborted) {
-          channels.delete(invocation.id);
-          await send({ id: invocation.id, channel: true, close: true });
+
+        if ("channel" in invocation && "close" in invocation) {
+          const channel = channels.get(invocation.id);
+          if (channel) {
+            channel.close();
+            channels.delete(invocation.id);
+          }
           continue;
         }
-        await channel.send(invocation.message).catch((err) => {
-          console.error("error sending message through channel", err);
-        });
-        continue;
-      }
-      if ("channel" in invocation && "close" in invocation) {
-        const channel = channels.get(invocation.id);
-        if (channel) {
-          channel.close();
-          channels.delete(invocation.id);
+
+        if ("cancelStream" in invocation) {
+          const stream = streams.get(invocation.id);
+          if (stream) {
+            await stream.return?.();
+            streams.delete(invocation.id);
+          }
+          continue;
         }
-        continue;
-      }
-      if ("cancelStream" in invocation) {
-        const stream = streams.get(invocation.id);
-        if (stream) {
-          stream.return?.();
-          streams.delete(invocation.id);
-        }
-        continue;
-      }
-      promises.push(
-        invoker.invoke(...invocation.invoke)
-          .then(async (result) => {
+
+        const promise = (async () => {
+          try {
+            const result = await invoker.invoke(...invocation.invoke);
+
+            if (signal.aborted) return;
+
             if (isEventStreamResponse(result)) {
+              streams.set(invocation.id, result);
               let error: undefined | unknown;
+
               try {
-                streams.set(invocation.id, result);
                 await send({
                   id: invocation.id,
                   stream: true,
                   start: true,
-                });
+                }).catch(ignoreIfClosed);
+
                 for await (const chunk of result) {
+                  if (signal.aborted) break;
                   await send({
                     id: invocation.id,
                     result: chunk,
                     stream: true,
-                  });
+                  }).catch(ignoreIfClosed);
                 }
               } catch (err) {
                 error = err;
               } finally {
-                await send({
-                  id: invocation.id,
-                  stream: true,
-                  end: true,
-                  error: error ? convertError(error) : undefined,
-                });
                 streams.delete(invocation.id);
+                if (!signal.aborted) {
+                  await send({
+                    id: invocation.id,
+                    stream: true,
+                    end: true,
+                    error: error ? convertError(error) : undefined,
+                  }).catch(ignoreIfClosed);
+                }
               }
               return;
             }
+
             if (isChannel(result)) {
               channels.set(invocation.id, result);
               try {
@@ -185,46 +203,59 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
                   id: invocation.id,
                   channel: true,
                   opened: true,
-                });
-                for await (const message of result.recv()) {
+                }).catch(ignoreIfClosed);
+
+                for await (const message of result.recv(signal)) {
                   await send({
                     id: invocation.id,
                     channel: true,
                     message,
+                  }).catch((err) => {
+                    if (!signal.aborted) throw err;
                   });
                 }
-              } catch (err) {
-                if (result.signal.aborted) {
-                  return;
-                }
-                console.error(`could not send channel message: ${err}`);
               } finally {
                 channels.delete(invocation.id);
-                await send({ id: invocation.id, channel: true, close: true })
-                  .catch((err) => {
-                    console.error(
-                      `could not send close channel message: ${err}`,
-                    );
-                  });
+                if (!signal.aborted) {
+                  await send({
+                    id: invocation.id,
+                    channel: true,
+                    close: true,
+                  }).catch(ignoreIfClosed);
+                }
               }
               return;
             }
-            return send({
+
+            await send({
               id: invocation.id,
               result,
-            });
-          })
-          .catch((error) => {
+            }).catch(ignoreIfClosed);
+          } catch (error) {
+            if (signal.aborted) return;
             const payload = convertError(error);
-            return send({
+            await send({
               ...payload,
               id: invocation.id,
-            });
-          }),
-      );
+            }).catch(ignoreIfClosed);
+          }
+        })();
+
+        promises.push(promise);
+      }
+    } finally {
+      // Clean up
+      for (const stream of streams.values()) {
+        await stream.return?.().catch(console.error);
+      }
+      streams.clear();
+
+      for (const channel of channels.values()) {
+        channel.close();
+      }
+      channels.clear();
+
+      await Promise.allSettled(promises);
     }
-    streams.forEach((stream) => stream.return?.());
-    channels.forEach((channel) => channel.close());
-    await Promise.allSettled(promises);
   };
 };
