@@ -59,13 +59,44 @@ export interface WebSocketUpgrade {
   socket: WebSocket;
   response: Response;
 }
+
+const useCorsCredentials = (
+  allowedOrigins: string[],
+  reqHeaders: Headers,
+  respHeaders: Headers,
+) => {
+  const origin = reqHeaders.get("origin");
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return;
+  }
+  respHeaders.set(
+    "Access-Control-Allow-Origin",
+    origin,
+  );
+  respHeaders.set("Access-Control-Allow-Methods", "*");
+  // according to MDN https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Headers
+  // requests with credentials require a specific list of headers instead of *
+
+  const reqHeadersList: string[] = [];
+  reqHeaders.forEach((_, key) => {
+    reqHeadersList.push(key);
+  });
+
+  respHeaders.set(
+    "Access-Control-Allow-Headers",
+    reqHeadersList.join(","),
+  );
+  respHeaders.set("Access-Control-Allow-Credentials", "true");
+};
+
 export type WebSocketUpgradeHandler = (
   req: Request,
 ) => WebSocketUpgrade | Promise<WebSocketUpgrade>;
+export interface Env extends Record<string, string> {}
 /**
  * Represents the runtime for managing and invoking actors.
  */
-export class StdActorRuntime<TEnv extends object = object>
+export class StdActorRuntime<TEnv extends Env = Env>
   implements ActorRuntime<TEnv> {
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
@@ -210,6 +241,17 @@ export class StdActorRuntime<TEnv extends object = object>
           res?.return?.();
         };
 
+        const sseHeaders = new Headers({
+          "Content-Type": EVENT_STREAM_RESPONSE_HEADER,
+        });
+        // due to a cloudflare bug which text/event-stream headers are immutable and cors canno't be set.
+        if (this.env?.USE_SSE_CORS_ORIGIN) {
+          useCorsCredentials(
+            this.env.USE_SSE_CORS_ORIGIN.split(","),
+            req.headers,
+            sseHeaders,
+          );
+        }
         return new Response(
           new ReadableStream<ServerSentEventMessage>({
             async pull(controller) {
@@ -229,9 +271,7 @@ export class StdActorRuntime<TEnv extends object = object>
             },
           }).pipeThrough(new ServerSentEventStream()),
           {
-            headers: {
-              "Content-Type": EVENT_STREAM_RESPONSE_HEADER,
-            },
+            headers: sseHeaders,
           },
         );
       }
