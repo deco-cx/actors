@@ -120,3 +120,35 @@ new_classes = ["ActorDurableObject"]
 ```
 
 You check the full example [here](./examples/cf/)
+
+If you want to work with alarms you need to create a durable object per actor,
+in order to achieve that you need to import `WithRuntime` Mixin from cf package
+and re-export as the name that you provide in the wrangler.toml
+
+```tsx
+import { ActorCfRuntime, Env, WithRuntime } from "@deco/actors/cf";
+import { withActors } from "@deco/actors/hono";
+import { Hono } from "hono";
+import { Counter as MCounter } from "./counter.ts";
+const app = new Hono<{ Bindings: Env }>();
+
+const runtime = new ActorCfRuntime([MCounter]);
+app.use(withActors(runtime));
+
+app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
+
+export const Counter = WithRuntime(MCounter);
+export default app;
+```
+
+```toml
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "Counter"
+
+# Durable Object migrations.
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["Counter"]
+```
