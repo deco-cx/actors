@@ -53,7 +53,7 @@ export class ActorDurableObject {
     }
     this.alarms = {
       saveActorMetadata: async (options) => {
-        await state.storage.set(ACTOR_METADATA_KEY, options);
+        await state.storage.put(ACTOR_METADATA_KEY, options);
       },
       retrieveActorMetadata: async () => {
         return (await state.storage.get(ACTOR_METADATA_KEY));
