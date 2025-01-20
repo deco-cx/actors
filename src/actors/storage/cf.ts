@@ -1,5 +1,4 @@
 import type { DurableObjectStorage } from "@cloudflare/workers-types";
-import type { AlarmsManager } from "../runtimes/cf/alarms.ts";
 import type {
   ActorStorage,
   ActorStorageGetOptions,
@@ -14,27 +13,16 @@ export class DurableObjectActorStorage implements ActorStorage {
       actorName: string;
       actorId: string;
     },
-    private alarms: AlarmsManager,
   ) {}
 
   async setAlarm(dt: number): Promise<void> {
-    await this.alarms.scheduleActorAlarm(
-      this.options.actorId,
-      this.options.actorName,
-      dt,
-    );
+    await this.storage.setAlarm(dt);
   }
-  async getAlarm(): Promise<number | null> {
-    return await this.alarms.getActorNextAlarm(
-      this.options.actorId,
-      this.options.actorName,
-    );
+  getAlarm(): Promise<number | null> {
+    return this.storage.getAlarm();
   }
   async deleteAlarm(): Promise<void> {
-    return await this.alarms.cancelActorAlarm(
-      this.options.actorId,
-      this.options.actorName,
-    );
+    await this.storage.deleteAlarm();
   }
 
   private buildKey(key: string[] | string[][]): string {
@@ -198,7 +186,6 @@ export class DurableObjectActorStorage implements ActorStorage {
       const storage = new DurableObjectActorStorage(
         txn,
         this.options,
-        this.alarms,
       );
       await closure(storage);
     });
