@@ -1,4 +1,8 @@
-import type { DurableObjectStorage } from "@cloudflare/workers-types";
+import type {
+  DurableObjectStorage,
+  DurableObjectTransaction,
+} from "@cloudflare/workers-types";
+import type { AlarmsManager } from "../runtimes/cf/actorDO.ts";
 import type {
   ActorStorage,
   ActorStorageGetOptions,
@@ -6,16 +10,19 @@ import type {
   ActorStoragePutOptions,
 } from "../storage.ts";
 
+export interface ActorMetadata {
+  actorName: string;
+  actorId: string;
+}
 export class DurableObjectActorStorage implements ActorStorage {
   constructor(
     private storage: DurableObjectStorage | DurableObjectTransaction,
-    private options: {
-      actorName: string;
-      actorId: string;
-    },
+    private options: ActorMetadata,
+    private alarms?: AlarmsManager,
   ) {}
 
   async setAlarm(dt: number): Promise<void> {
+    await this.alarms?.saveActorMetadata(this.options);
     await this.storage.setAlarm(dt);
   }
   getAlarm(): Promise<number | null> {

@@ -11,11 +11,11 @@ compatibility_date = "2024-11-27"
 enabled = true
 
 [[durable_objects.bindings]]
-name = "ACTOR_DO"
-class_name = "ActorDurableObject"
+name = "COUNTER"
+class_name = "Counter"
 
 # Durable Object migrations.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#migrations
 [[migrations]]
 tag = "v1"
-new_classes = ["ActorDurableObject"]
+new_classes = ["Counter"]

@@ -28,7 +28,7 @@ export class Counter {
   }
 
   alarm() {
-    console.log("HELLO");
+    console.log("HELLO", this.state.id);
   }
 
   schedule() {
