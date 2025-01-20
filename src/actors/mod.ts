@@ -12,6 +12,7 @@ export type {
   ActorProxy,
   ActorProxy as ActorStub,
   StubFactory,
-  StubFactoryFn,
+  StubFactoryFn
 } from "./stubutil.ts";
-export { actorId } from "./util/id.ts";
+export { getActorLocator } from "./util/locator.ts";
+

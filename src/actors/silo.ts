@@ -35,7 +35,6 @@ export class ActorSilo<TEnv extends object = object> {
       actorId: string,
       actorName: string,
     ) => ActorStorage,
-    private discriminator?: string,
     private env?: TEnv,
   ) {
     this.invoker = {
@@ -49,14 +48,13 @@ export class ActorSilo<TEnv extends object = object> {
       const storage = this.getActorStorage(this.actorId, Actor.name);
       const state = new ActorState({
         id: this.actorId,
-        discriminator: this.discriminator,
         storage,
         stub: (actor, options) => {
-          const invoker = (id: string, discriminator?: string) => {
+          const invoker = (id: string) => {
             if (id === this.actorId) {
               return this.invoker;
             }
-            return createHttpInvoker(id, discriminator, options);
+            return createHttpInvoker(id, options);
           };
           return create(actor, invoker);
         },

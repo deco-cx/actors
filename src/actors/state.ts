@@ -5,7 +5,6 @@ import type { create } from "./stubutil.ts";
 
 export interface ActorStateOptions {
   id: string;
-  discriminator?: string;
   storage: ActorStorage;
   stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
@@ -17,7 +16,6 @@ export interface ActorStateOptions {
  */
 export class ActorState {
   public id: string;
-  public discriminator?: string;
   public storage: ActorStorage;
   public stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
@@ -28,7 +26,6 @@ export class ActorState {
     this.storage = options.storage;
     this.stub = options.stub;
     this.id = options.id;
-    this.discriminator = options.discriminator;
   }
 
   blockConcurrencyWhile<T>(callback: () => Promise<T>): Promise<T> {

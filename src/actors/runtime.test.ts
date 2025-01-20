@@ -103,7 +103,7 @@ Deno.test("counter tests", async () => {
   const counterStub = actors.stub(Counter, { maxWsChunkSize: 24 });
 
   const counterActor = counterStub.id(actorId);
-  using rpcActor = counterStub.id("12345", "1234").rpc();
+  using rpcActor = counterStub.id("12345").rpc();
 
   for (const actor of [rpcActor, counterActor]) {
     const name = `Counter Actor`;
