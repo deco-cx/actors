@@ -1,5 +1,8 @@
 // src/durableObject.ts
-import type { DurableObjectState } from "@cloudflare/workers-types";
+import type {
+  DurableObject,
+  DurableObjectState,
+} from "@cloudflare/workers-types";
 import {
   type Actor,
   type ActorConstructor,
@@ -47,7 +50,9 @@ export class ActorDurableObject {
   }
 }
 
-export function WithRuntime<T extends Actor>(Actor: ActorConstructor<T>) {
+export function WithRuntime<T extends Actor>(
+  Actor: ActorConstructor<T>,
+): DurableObject {
   return class DurableActor {
     private runtime: StdActorRuntime;
 
