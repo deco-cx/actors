@@ -14,4 +14,4 @@ export type {
   StubFactory,
   StubFactoryFn,
 } from "./stubutil.ts";
-export { actorId } from "./util/id.ts";
+export { getActorLocator } from "./util/locator.ts";

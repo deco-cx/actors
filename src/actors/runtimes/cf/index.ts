@@ -1,2 +1,2 @@
-export { ActorDurableObject } from "./actorDO.ts";
+export { ActorDurableObject, WithRuntime } from "./actorDO.ts";
 export { ActorCfRuntime, type Env } from "./fetcher.ts";

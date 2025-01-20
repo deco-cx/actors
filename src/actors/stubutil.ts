@@ -18,8 +18,6 @@ export const ACTOR_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
 export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
 export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
-export const ACTOR_DISCRIMINATOR_HEADER_NAME = "x-actor-discriminator";
-export const ACTOR_DISCRIMINATOR_QS_NAME = "actor_discriminator";
 
 export type StubFactory<TInstance> = {
   id: StubFactoryFn<TInstance>;
@@ -27,7 +25,6 @@ export type StubFactory<TInstance> = {
 
 export type StubFactoryFn<TInstance> = (
   id: string,
-  discriminator?: string,
 ) => ActorStub<TInstance>;
 /**
  * Promise.prototype.then onfufilled callback type.
@@ -406,7 +403,6 @@ export const createHttpInvoker = <
   TChannel extends DuplexChannel<unknown, unknown>,
 >(
   actorId: string,
-  discriminator?: string,
   options?: ActorsOptions,
 ): ActorInvoker<TResponse, TChannel> => {
   const server = options?.server;
@@ -428,10 +424,6 @@ export const createHttpInvoker = <
             ),
           )
         }&${ACTOR_ID_QS_NAME}=${actorId}${
-          discriminator
-            ? `&${ACTOR_DISCRIMINATOR_QS_NAME}=${discriminator}`
-            : ""
-        }${
           options?.maxWsChunkSize
             ? `&${ACTOR_MAX_CHUNK_SIZE_QS_NAME}=${options.maxWsChunkSize}`
             : ""
@@ -455,9 +447,6 @@ export const createHttpInvoker = <
           headers: {
             "Content-Type": "application/json",
             [options?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]: actorId,
-            ...discriminator
-              ? { [ACTOR_DISCRIMINATOR_HEADER_NAME]: discriminator }
-              : {},
             ...actorsServer.deploymentId
               ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
               : {},
@@ -522,23 +511,22 @@ export const createHttpInvoker = <
 export const WELL_KNOWN_RPC_MEHTOD = "_rpc";
 export const create = <TInstance extends Actor>(
   actor: ActorConstructor<TInstance> | string,
-  invokerFactory: (id: string, discriminator?: string) => ActorInvoker,
+  invokerFactory: (id: string) => ActorInvoker,
   metadata?: unknown,
   disposer?: () => void,
 ): StubFactory<TInstance> => {
   const name = typeof actor === "string" ? actor : actor.name;
   return {
-    id: (id: string, discriminator?: string): ActorProxy<TInstance> => {
+    id: (id: string): ActorProxy<TInstance> => {
       return new Proxy<ActorProxy<TInstance>>({} as ActorProxy<TInstance>, {
         get: (_, method) => {
           if (method === "withMetadata") {
-            return (m: unknown) =>
-              create(actor, invokerFactory, m).id(id, discriminator);
+            return (m: unknown) => create(actor, invokerFactory, m).id(id);
           }
           if (method === Symbol.dispose && disposer) {
             return disposer;
           }
-          const invoker = invokerFactory(id, discriminator);
+          const invoker = invokerFactory(id);
           if (method === "rpc") {
             return () => {
               const awaiter = new ActorAwaiter(
@@ -556,7 +544,6 @@ export const create = <TInstance extends Actor>(
                 () => awaiter.close(),
               ).id(
                 id,
-                discriminator,
               );
             };
           }

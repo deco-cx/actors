@@ -28,11 +28,11 @@ export class Counter {
   }
 
   alarm() {
-    console.log("HELLO");
+    console.log("HELLO", this.state.id);
   }
 
-  schedule() {
-    this.state.storage.setAlarm(new Date().getTime() + 5000);
+  async schedule() {
+    await this.state.storage.setAlarm(new Date().getTime() + 5000);
   }
 
   getCount(): number {

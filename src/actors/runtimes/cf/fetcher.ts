@@ -2,14 +2,23 @@ import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 import type { ActorConstructor, ActorRuntime } from "../../runtime.ts";
 import { type ActorFetcher, actors } from "../../stub.ts";
 import { ACTOR_ID_HEADER_NAME, type StubFactory } from "../../stubutil.ts";
-import { actorId as getActorId } from "../../util/id.ts";
+import { getActorLocator } from "../../util/locator.ts";
 import { registerActors } from "./actorDO.ts";
 import { WebSocketWrapper } from "./wsWrapper.ts";
 
-export interface Env {
+export interface Env extends Record<string, DurableObjectNamespace> {
   ACTOR_DO: DurableObjectNamespace;
 }
 
+/**
+ * e.g. CountDown => COUNT_DOWN
+ */
+function toSnakeUpperCase(input: string) {
+  return input
+    .replace(/([a-z])([A-Z])/g, "$1_$2") // Insert underscore between lowercase and uppercase letters
+    .replace(/[\s-]+/g, "_") // Replace spaces and hyphens with underscores
+    .toUpperCase(); // Convert to uppercase
+}
 export class ActorCfRuntime<
   TEnvs extends object = object,
   TActors extends Array<ActorConstructor> = Array<ActorConstructor>,
@@ -50,14 +59,17 @@ export class ActorCfRuntime<
     if (!env) {
       return undefined;
     }
-    const actorId = getActorId(request);
+    const actor = getActorLocator(request);
 
-    if (!actorId) {
+    if (!actor?.id) {
       return undefined;
     }
+    const actorId = actor.id;
+    const doName = toSnakeUpperCase(actor.name);
+    const DO = doName in env ? env[doName] : env.ACTOR_DO;
 
-    const id = env.ACTOR_DO.idFromName(actorId);
-    return env.ACTOR_DO.get(id);
+    const id = DO.idFromName(actorId);
+    return DO.get(id);
   }
   fetcher(env?: Env): ActorFetcher {
     return {

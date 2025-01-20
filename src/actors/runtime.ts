@@ -13,14 +13,12 @@ import {
 import type { ActorFetcher } from "./stub.ts";
 import {
   ACTOR_CONSTRUCTOR_NAME_HEADER,
-  ACTOR_DISCRIMINATOR_HEADER_NAME,
-  ACTOR_DISCRIMINATOR_QS_NAME,
   ACTOR_ID_HEADER_NAME,
   ACTOR_MAX_CHUNK_SIZE_QS_NAME,
 } from "./stubutil.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
-import { actorId as getActorId } from "./util/id.ts";
+import { getActorLocator } from "./util/locator.ts";
 import {
   type ServerSentEventMessage,
   ServerSentEventStream,
@@ -42,22 +40,6 @@ export interface Actor {}
 
 export const ACTORS_API_SEGMENT = "actors";
 export const ACTORS_INVOKE_API_SEGMENT = "invoke";
-
-const parseActorInvokeApi = (pathname: string) => {
-  if (!pathname) {
-    return null;
-  }
-  const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const [_, actorsApiSegment, actorName, invokeApiSegment, methodName] =
-    normalized.split("/");
-  if (
-    actorsApiSegment !== ACTORS_API_SEGMENT ||
-    invokeApiSegment !== ACTORS_INVOKE_API_SEGMENT
-  ) {
-    return null;
-  }
-  return { actorName, methodName };
-};
 
 export type ActorConstructor<
   TInstance extends Actor = Actor,
@@ -138,16 +120,15 @@ export class StdActorRuntime<TEnv extends object = object>
     });
   }
 
-  private getOrCreateSilo(actorId: string, discriminator?: string): ActorSilo {
+  private getOrCreateSilo(actorId: string): ActorSilo {
     let silo = this.silos.get(
-      discriminator ? `${actorId}#${discriminator}` : actorId,
+      actorId,
     );
     if (!silo) {
       silo = new ActorSilo(
         this.actorsConstructors,
         actorId,
         this.getActorStorage.bind(this),
-        discriminator,
         this.env,
       );
       this.silos.set(actorId, silo);
@@ -160,19 +141,6 @@ export class StdActorRuntime<TEnv extends object = object>
     return this.fetch(req);
   }
 
-  actorDiscriminator(req: Request): string | null;
-  actorDiscriminator(url: URL, req: Request): string | null;
-  actorDiscriminator(reqOrUrl: URL | Request, req?: Request): string | null {
-    if (reqOrUrl instanceof Request) {
-      return this.actorDiscriminator(new URL(reqOrUrl.url), reqOrUrl);
-    }
-    if (reqOrUrl instanceof URL && req instanceof Request) {
-      return req.headers.get(ACTOR_DISCRIMINATOR_HEADER_NAME) ??
-        reqOrUrl.searchParams.get(ACTOR_DISCRIMINATOR_QS_NAME);
-    }
-    return null;
-  }
-
   /**
    * Handles an incoming request and invokes the corresponding actor method.
    * @param req - The incoming request.
@@ -180,23 +148,23 @@ export class StdActorRuntime<TEnv extends object = object>
    */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const actorId = getActorId(url, req);
-    if (!actorId) {
+    const locator = getActorLocator(url, req);
+
+    if (!locator) {
+      return new Response(null, { status: 404 });
+    }
+
+    if (!locator?.id) {
       return new Response(`missing ${ACTOR_ID_HEADER_NAME} header`, {
         status: 400,
       });
     }
 
     const silo = this.getOrCreateSilo(
-      actorId,
-      this.actorDiscriminator(url, req) || undefined,
+      locator.id,
     );
 
-    const result = parseActorInvokeApi(url.pathname);
-    if (!result) {
-      return new Response(null, { status: 404 });
-    }
-    const { actorName, methodName } = result;
+    const { name: actorName, method: methodName } = locator;
     if (!methodName || !actorName) {
       return new Response(
         `method ${methodName} not found for the actor ${actorName}`,

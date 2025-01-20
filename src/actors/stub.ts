@@ -34,8 +34,7 @@ export const actors = {
     actor: ActorConstructor<TInstance> | string,
     options?: ActorsOptions | undefined,
   ): StubFactory<TInstance> => {
-    const factory = (id: string, discriminator?: string) =>
-      createHttpInvoker(id, discriminator, options);
+    const factory = (id: string) => createHttpInvoker(id, options);
     return create(actor, factory);
   },
   stub: <TInstance extends Actor>(
