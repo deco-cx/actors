@@ -1,5 +1,5 @@
 import { assertEquals, assertFalse } from "jsr:@std/assert@^1.0.5";
-import { RuntimeClass } from "./mod.ts";
+import { Actor } from "./mod.ts";
 import { StdActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 import { actors } from "./stub.ts";
@@ -7,7 +7,7 @@ import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
 const HELLO_COUNT = 200;
-@RuntimeClass.Actor
+@Actor
 class Hello {
   sayHello(): string {
     return "Hello, World!";
@@ -21,7 +21,7 @@ class Hello {
     });
   }
 }
-@RuntimeClass.Actor
+@Actor
 class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();

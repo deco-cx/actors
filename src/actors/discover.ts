@@ -18,5 +18,5 @@ export const RuntimeClass: {
   ) => TConstructor;
 } = IS_DENO ? StdActorRuntime : ActorCfRuntime;
 
-export const DEFAULT_RUNTIME = new RuntimeClass();
+export const RUNTIME = new RuntimeClass();
 export const Actor = RuntimeClass.Actor;
