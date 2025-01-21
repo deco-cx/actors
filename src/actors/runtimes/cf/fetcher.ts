@@ -1,9 +1,10 @@
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
+import { Registry } from "../../registry.ts";
 import type { ActorConstructor, ActorRuntime } from "../../runtime.ts";
 import { type ActorFetcher, actors } from "../../stub.ts";
 import { ACTOR_ID_HEADER_NAME, type StubFactory } from "../../stubutil.ts";
 import { getActorLocator } from "../../util/locator.ts";
-import { registerActors } from "./actorDO.ts";
+import { defineWebSocketHandler } from "./actorDO.ts";
 import { WebSocketWrapper } from "./wsWrapper.ts";
 
 export interface Env extends Record<string, DurableObjectNamespace> {
@@ -23,8 +24,11 @@ export class ActorCfRuntime<
   TEnvs extends object = object,
   TActors extends Array<ActorConstructor> = Array<ActorConstructor>,
 > implements ActorRuntime<Env & TEnvs> {
-  constructor(protected actorsConstructors: TActors) {
-    registerActors(actorsConstructors, () => {
+  constructor(protected actorsConstructors?: TActors) {
+    if (this.actorsConstructors) {
+      Registry.register(...this.actorsConstructors);
+    }
+    defineWebSocketHandler(() => {
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
       const originalAccept = server.accept.bind(server);

@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import process from "node:process";
 import { ActorError } from "./errors.ts";
+import { Registry } from "./registry.ts";
 import { ActorSilo } from "./silo.ts";
 import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
@@ -77,14 +78,17 @@ export class StdActorRuntime<TEnv extends object = object>
     | undefined;
 
   private websocketHandler?: WebSocketUpgradeHandler;
+  protected actorsConstructors: Array<ActorConstructor>;
   /**
    * Creates an instance of ActorRuntime.
    * @param actorsConstructors - An array of actor constructors.
    */
   constructor(
-    protected actorsConstructors: Array<ActorConstructor>,
     protected env?: TEnv,
+    _actorsConstructors?: Array<ActorConstructor>,
   ) {
+    this.actorsConstructors = _actorsConstructors ?? Registry.registered() ??
+      [];
     this.websocketHandler = typeof Deno === "object"
       ? Deno?.upgradeWebSocket
       : undefined;

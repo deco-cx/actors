@@ -45,6 +45,9 @@ export class ActorSilo<TEnv extends object = object> {
 
   private initializeActors() {
     this.actorsConstructors.forEach((Actor) => {
+      if (this.actors.has(Actor.name)) {
+        return;
+      }
       const storage = this.getActorStorage(this.actorId, Actor.name);
       const state = new ActorState({
         id: this.actorId,

@@ -1,6 +1,7 @@
 // deno-lint-ignore no-empty-interface
 export interface Actor {
 }
+export { Actor } from "./registry.ts";
 // Backwards compatibility for the old name
 export { StdActorRuntime as ActorRuntime } from "./runtime.ts";
 
