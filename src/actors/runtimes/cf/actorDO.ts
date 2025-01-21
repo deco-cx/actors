@@ -3,6 +3,7 @@ import type {
   DurableObject,
   DurableObjectState,
 } from "@cloudflare/workers-types";
+import type { ActorOptions } from "../../registry.ts";
 import { Registry } from "../../registry.ts";
 import {
   type Actor,
@@ -73,13 +74,13 @@ export class ActorDurableObject {
  */
 export function CfActor<T extends Actor>(
   Actor: ActorConstructor<T>,
+  options?: ActorOptions,
 ): new (state: DurableObjectState, env: Env) => DurableObject {
-  Registry.register(Actor);
-  return class DurableActor extends ActorDurableObject {
+  Registry.register(options, Actor);
+  const DurableActor = class extends ActorDurableObject {
     constructor(state: DurableObjectState, env: Env) {
       super(state, env, [Actor]);
     }
-
     async alarm(): Promise<void> {
       const metadata = await this.alarms.retrieveActorMetadata();
       if (!metadata) {
@@ -101,4 +102,6 @@ export function CfActor<T extends Actor>(
       }
     }
   };
+  Object.defineProperty(DurableActor, "name", { value: Actor.name });
+  return DurableActor;
 }

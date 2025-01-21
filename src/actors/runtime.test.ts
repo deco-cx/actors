@@ -7,7 +7,7 @@ import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
 const HELLO_COUNT = 200;
-@Actor
+@Actor()
 class Hello {
   sayHello(): string {
     return "Hello, World!";
@@ -21,7 +21,8 @@ class Hello {
     });
   }
 }
-@Actor
+
+@Actor()
 class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();

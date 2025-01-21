@@ -2,7 +2,7 @@
 import process from "node:process";
 import { ActorError } from "./errors.ts";
 import type { ActorBase } from "./mod.ts";
-import { Actor as RegisterActor, Registry } from "./registry.ts";
+import { type ActorOptions, Registry } from "./registry.ts";
 import { ActorSilo } from "./silo.ts";
 import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
@@ -71,13 +71,20 @@ export class StdActorRuntime<TEnv extends object = object>
   /**
    * Mark an actor as registered.
    */
-  static Actor<
+  static Actor(
+    options?: ActorOptions,
+  ): <
     T extends ActorBase,
     TConstructor extends ActorConstructor<T>,
   >(
     Actor: TConstructor,
-  ): TConstructor {
-    return RegisterActor(Actor);
+  ) => TConstructor {
+    return (
+      Actor,
+    ) => {
+      Registry.register(options, Actor);
+      return Actor;
+    };
   }
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
@@ -158,6 +165,7 @@ export class StdActorRuntime<TEnv extends object = object>
   }
 
   /**
+   * WARNING: THIS FETCH DOES NOT SUPPORT ACTOR VISIBILITY MEANING THAT ALL ACTORS ARE EXPOSED BY DEFAULT AND THERE IS NO WAY TO MAKE THEM PRIVATE
    * Handles an incoming request and invokes the corresponding actor method.
    * @param req - The incoming request.
    * @returns A promise that resolves to the response.

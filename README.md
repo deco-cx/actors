@@ -38,7 +38,7 @@ and straightforward interaction across distributed environments.
 ```typescript
 import { Actor, actors, ActorState } from "@deco/actors";
 
-@Actor
+@Actor() // optionally set { visibility: "private" } to not expose through API (currently handled only by cf workers)
 class Counter {
   private count: number;
 

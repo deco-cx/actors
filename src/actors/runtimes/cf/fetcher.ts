@@ -1,5 +1,6 @@
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 import type { ActorBase } from "../../mod.ts";
+import type { ActorOptions } from "../../registry.ts";
 import { Registry } from "../../registry.ts";
 import type { ActorConstructor, ActorRuntime } from "../../runtime.ts";
 import { type ActorFetcher, actors } from "../../stub.ts";
@@ -27,18 +28,27 @@ export class ActorCfRuntime<
   /**
    * Mark an actor as registered.
    */
-  static Actor<
+  static Actor(
+    options?: ActorOptions,
+  ): <
     T extends ActorBase,
     TConstructor extends ActorConstructor<T>,
   >(
     Actor: TConstructor,
-  ): TConstructor {
-    return CfActor(Actor) as TConstructor;
+  ) => TConstructor {
+    return <
+      T extends ActorBase,
+      TConstructor extends ActorConstructor<T>,
+    >(
+      Actor: TConstructor,
+    ): TConstructor => {
+      return CfActor(Actor, options) as TConstructor;
+    };
   }
 
   constructor(protected actorsConstructors?: TActors) {
     if (this.actorsConstructors) {
-      Registry.register(...this.actorsConstructors);
+      Registry.register({}, ...this.actorsConstructors);
     }
     defineWebSocketHandler(() => {
       const webSocketPair = new WebSocketPair();
@@ -71,7 +81,11 @@ export class ActorCfRuntime<
     );
   }
 
-  private getDO(request: Request, env?: Env): DurableObjectStub | undefined {
+  private getDO(
+    request: Request,
+    env?: Env,
+    ensurePublic: boolean = false,
+  ): DurableObjectStub | undefined {
     if (!env) {
       return undefined;
     }
@@ -81,6 +95,11 @@ export class ActorCfRuntime<
       return undefined;
     }
     const actorId = actor.id;
+
+    if (ensurePublic && !Registry.isPublic(actor.name)) {
+      return undefined;
+    }
+
     const doName = toSnakeUpperCase(actor.name);
     const DO = doName in env ? env[doName] : env.ACTOR_DO;
 
@@ -112,7 +131,7 @@ export class ActorCfRuntime<
     };
   }
   fetch(request: Request, env?: Env | undefined): Promise<Response> | Response {
-    const durableObject = this.getDO(request, env);
+    const durableObject = this.getDO(request, env, true); // ensure public
     if (!durableObject) {
       return new Response(`Missing ${ACTOR_ID_HEADER_NAME} or Env`, {
         status: 400,
