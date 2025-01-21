@@ -4,7 +4,7 @@ import { Hono } from "hono";
 export { Counter } from "./counter.ts";
 const app = new Hono<{ Bindings: Env }>();
 
-const runtime = new ActorCfRuntime([]);
+const runtime = new ActorCfRuntime();
 app.use(withActors(runtime));
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));

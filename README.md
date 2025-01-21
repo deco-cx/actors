@@ -39,6 +39,7 @@ and straightforward interaction across distributed environments.
 import { Actor, actors, ActorState } from "@deco/actors";
 
 @Actor
+// you can use @CfActor from "@deco/actors/cf" you're using CF
 class Counter {
   private count: number;
 
