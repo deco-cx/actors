@@ -211,6 +211,13 @@ export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   : { (...args: Args): Promise<Awaited<Return>> }
   : Actor[key];
 
+export interface BaseMetadata {
+  $request: Request;
+}
+
+type MetadataObject<TMetadata> = TMetadata extends object
+  ? Omit<TMetadata, keyof BaseMetadata>
+  : TMetadata;
 /**
  * Represents an actor proxy.
  */
@@ -219,7 +226,7 @@ export type ActorProxy<Actor> =
     [key in keyof Actor]: PromisifyKey<Actor, key>;
   }
   & (Actor extends { metadata?: infer TMetadata } ? {
-      withMetadata(metadata: TMetadata): ActorProxy<Actor>;
+      withMetadata(metadata: MetadataObject<TMetadata>): ActorProxy<Actor>;
       rpc(): ActorProxy<Actor> & Disposable;
     }
     : { rpc(): ActorProxy<Actor> & Disposable });
@@ -540,7 +547,7 @@ export const create = <TInstance extends Actor>(
               return create(
                 actor,
                 () => rpcInvoker,
-                metadata,
+                undefined,
                 () => awaiter.close(),
               ).id(
                 id,

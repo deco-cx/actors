@@ -1,6 +1,8 @@
 import { ActorState } from "@deco/actors";
+import { CfActor } from "@deco/actors/cf";
 import { ChannelUpgrader, WatchTarget } from "@deco/actors/watch";
 
+@CfActor
 export class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();

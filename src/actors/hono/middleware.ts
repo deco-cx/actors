@@ -19,7 +19,6 @@ export const withActors = <TEnv extends object = object>(
       console.log("Restarting actors...");
       process.exit(1);
     }
-    const response = await fetcher.fetch(ctx.req.raw, ctx.env);
-    ctx.res = response;
+    ctx.res = await fetcher.fetch(ctx.req.raw, ctx.env);
   };
 };

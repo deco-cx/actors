@@ -195,7 +195,7 @@ export class StdActorRuntime<TEnv extends object = object>
         actorName,
         methodName,
         args,
-        metadata,
+        { ...metadata, $request: req },
       );
       if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
         if (!this.websocketHandler) {

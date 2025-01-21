@@ -1,4 +1,4 @@
-import type { Actor, ActorConstructor } from "./runtime.ts";
+import type { Actor as ActorBase, ActorConstructor } from "./runtime.ts";
 
 const REGISTERED_ACTORS: ActorConstructor[] = [];
 
@@ -6,7 +6,7 @@ const REGISTERED_ACTORS: ActorConstructor[] = [];
  * Mark an actor as registered.
  */
 export function Actor<
-  T extends Actor,
+  T extends ActorBase,
   TConstructor extends ActorConstructor<T>,
 >(
   Actor: TConstructor,

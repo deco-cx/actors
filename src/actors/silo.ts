@@ -86,7 +86,7 @@ export class ActorSilo<TEnv extends object = object> {
     await actorInstance.initialization;
     const method = KNOWN_METHODS[methodName] ?? methodName;
     if (isWellKnownRPCMethod(String(method))) {
-      const chan = rpc(this.invoker);
+      const chan = rpc(this.invoker, metadata);
       return chan;
     }
     if (!(method in actorInstance.actor)) {
