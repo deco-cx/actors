@@ -1,7 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import process from "node:process";
 import { ActorError } from "./errors.ts";
-import { Registry } from "./registry.ts";
+import type { ActorBase } from "./mod.ts";
+import { Actor as RegisterActor, Registry } from "./registry.ts";
 import { ActorSilo } from "./silo.ts";
 import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
@@ -24,7 +25,6 @@ import {
   type ServerSentEventMessage,
   ServerSentEventStream,
 } from "./util/sse.ts";
-
 /**
  * Represents a fetcher for actors.
  */
@@ -68,6 +68,17 @@ export type WebSocketUpgradeHandler = (
  */
 export class StdActorRuntime<TEnv extends object = object>
   implements ActorRuntime<TEnv> {
+  /**
+   * Mark an actor as registered.
+   */
+  static Actor<
+    T extends ActorBase,
+    TConstructor extends ActorConstructor<T>,
+  >(
+    Actor: TConstructor,
+  ): TConstructor {
+    return RegisterActor(Actor);
+  }
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
   private silos: Map<string, ActorSilo> = new Map<string, ActorSilo>();
@@ -93,6 +104,7 @@ export class StdActorRuntime<TEnv extends object = object>
       ? Deno?.upgradeWebSocket
       : undefined;
   }
+  fetcher?: ((env?: TEnv | undefined) => ActorFetcher) | undefined;
 
   setWebSocketHandler(
     handler: WebSocketUpgradeHandler,

@@ -1,14 +1,14 @@
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
+import type { ActorBase } from "../../mod.ts";
 import { Registry } from "../../registry.ts";
 import type { ActorConstructor, ActorRuntime } from "../../runtime.ts";
 import { type ActorFetcher, actors } from "../../stub.ts";
 import { ACTOR_ID_HEADER_NAME, type StubFactory } from "../../stubutil.ts";
 import { getActorLocator } from "../../util/locator.ts";
-import { defineWebSocketHandler } from "./actorDO.ts";
+import { CfActor, defineWebSocketHandler } from "./actorDO.ts";
 import { WebSocketWrapper } from "./wsWrapper.ts";
-
 export interface Env extends Record<string, DurableObjectNamespace> {
-  ACTOR_DO: DurableObjectNamespace;
+  ACTOR_DO?: DurableObjectNamespace;
 }
 
 /**
@@ -24,6 +24,18 @@ export class ActorCfRuntime<
   TEnvs extends object = object,
   TActors extends Array<ActorConstructor> = Array<ActorConstructor>,
 > implements ActorRuntime<Env & TEnvs> {
+  /**
+   * Mark an actor as registered.
+   */
+  static Actor<
+    T extends ActorBase,
+    TConstructor extends ActorConstructor<T>,
+  >(
+    Actor: TConstructor,
+  ): TConstructor {
+    return CfActor(Actor) as TConstructor;
+  }
+
   constructor(protected actorsConstructors?: TActors) {
     if (this.actorsConstructors) {
       Registry.register(...this.actorsConstructors);

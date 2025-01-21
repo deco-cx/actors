@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "@hono/hono";
 import process from "node:process";
+import { DEFAULT_RUNTIME } from "../discover.ts";
 import type { ActorRuntime } from "../runtime.ts";
 
 /**
@@ -7,7 +8,7 @@ import type { ActorRuntime } from "../runtime.ts";
  * the default base path is `/actors`.
  */
 export const withActors = <TEnv extends object = object>(
-  fetcher: ActorRuntime<TEnv>,
+  fetcher: ActorRuntime<TEnv> = DEFAULT_RUNTIME,
   basePath = "/actors",
 ): MiddlewareHandler<{ Bindings: TEnv }> => {
   return async (ctx, next) => {

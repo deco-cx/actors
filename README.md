@@ -39,7 +39,6 @@ and straightforward interaction across distributed environments.
 import { Actor, actors, ActorState } from "@deco/actors";
 
 @Actor
-// you can use @CfActor from "@deco/actors/cf" you're using CF
 class Counter {
   private count: number;
 
@@ -79,15 +78,14 @@ To deploy your actors on Cloudflare Workers:
 1. Create your worker script (using Hono):
 
 ```typescript
-import { ActorCfRuntime, Env } from "@deco/actors/cf";
+import { Env } from "@deco/actors/cf";
 import { withActors } from "@deco/actors/hono";
 import { Hono } from "hono";
 export { Counter } from "./counter.ts";
 
 const app = new Hono<{ Bindings: Env }>();
 
-const runtime = new ActorCfRuntime();
-app.use(withActors(runtime));
+app.use(withActors());
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
 
@@ -127,14 +125,13 @@ in order to achieve that you need to import `CfActor` Mixin from cf package and
 re-export as the name that you provide in the wrangler.toml
 
 ```tsx
-import { ActorCfRuntime, CfActor, Env } from "@deco/actors/cf";
+import { Env } from "@deco/actors/cf";
 import { withActors } from "@deco/actors/hono";
 import { Hono } from "hono";
 export { Counter } from "./counter.ts";
 const app = new Hono<{ Bindings: Env }>();
 
-const runtime = new ActorCfRuntime();
-app.use(withActors(runtime));
+app.use(withActors());
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
 
