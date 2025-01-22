@@ -36,9 +36,8 @@ and straightforward interaction across distributed environments.
 ## Example: Simple Atomic Counter without Distributed Locks
 
 ```typescript
-import { Actor, actors, ActorState } from "@deco/actors";
+import { actors, ActorState } from "@deco/actors";
 
-@Actor() // optionally set { visibility: "private" } to not expose through API (currently handled only by cf workers)
 class Counter {
   private count: number;
 
@@ -78,14 +77,16 @@ To deploy your actors on Cloudflare Workers:
 1. Create your worker script (using Hono):
 
 ```typescript
-import { Env } from "@deco/actors/cf";
+import { ActorCfRuntime, Env } from "@deco/actors/cf";
 import { withActors } from "@deco/actors/hono";
 import { Hono } from "hono";
-export { Counter } from "./counter.ts";
+import { Counter } from "./counter.ts";
+export { ActorDurableObject } from "@deco/actors/cf";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use(withActors());
+const runtime = new ActorCfRuntime([Counter]);
+app.use(withActors(runtime));
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
 
@@ -121,20 +122,22 @@ new_classes = ["ActorDurableObject"]
 You check the full example [here](./examples/cf/)
 
 If you want to work with alarms you need to create a durable object per actor,
-in order to achieve that you need to import `CfActor` Mixin from cf package and
-re-export as the name that you provide in the wrangler.toml
+in order to achieve that you need to import `WithRuntime` Mixin from cf package
+and re-export as the name that you provide in the wrangler.toml
 
 ```tsx
-import { Env } from "@deco/actors/cf";
+import { ActorCfRuntime, Env, WithRuntime } from "@deco/actors/cf";
 import { withActors } from "@deco/actors/hono";
 import { Hono } from "hono";
-export { Counter } from "./counter.ts";
+import { Counter as MCounter } from "./counter.ts";
 const app = new Hono<{ Bindings: Env }>();
 
-app.use(withActors());
+const runtime = new ActorCfRuntime([MCounter]);
+app.use(withActors(runtime));
 
 app.get("/", (c) => c.text("Hello Cloudflare Workers!"));
 
+export const Counter = WithRuntime(MCounter);
 export default app;
 ```
 

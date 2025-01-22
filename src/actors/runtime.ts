@@ -1,8 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import process from "node:process";
 import { ActorError } from "./errors.ts";
-import type { ActorBase } from "./mod.ts";
-import { type ActorOptions, Registry } from "./registry.ts";
 import { ActorSilo } from "./silo.ts";
 import type { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
@@ -25,6 +23,7 @@ import {
   type ServerSentEventMessage,
   ServerSentEventStream,
 } from "./util/sse.ts";
+
 /**
  * Represents a fetcher for actors.
  */
@@ -68,24 +67,6 @@ export type WebSocketUpgradeHandler = (
  */
 export class StdActorRuntime<TEnv extends object = object>
   implements ActorRuntime<TEnv> {
-  /**
-   * Mark an actor as registered.
-   */
-  static Actor(
-    options?: ActorOptions,
-  ): <
-    T extends ActorBase,
-    TConstructor extends ActorConstructor<T>,
-  >(
-    Actor: TConstructor,
-  ) => TConstructor {
-    return (
-      Actor,
-    ) => {
-      Registry.register(options, Actor);
-      return Actor;
-    };
-  }
   // Generally will be only one silo per runtime
   // but this makes it possible to have multiple silos for testing locally
   private silos: Map<string, ActorSilo> = new Map<string, ActorSilo>();
@@ -96,22 +77,18 @@ export class StdActorRuntime<TEnv extends object = object>
     | undefined;
 
   private websocketHandler?: WebSocketUpgradeHandler;
-  protected actorsConstructors: Array<ActorConstructor>;
   /**
    * Creates an instance of ActorRuntime.
    * @param actorsConstructors - An array of actor constructors.
    */
   constructor(
+    protected actorsConstructors: Array<ActorConstructor>,
     protected env?: TEnv,
-    _actorsConstructors?: Array<ActorConstructor>,
   ) {
-    this.actorsConstructors = _actorsConstructors ?? Registry.registered() ??
-      [];
     this.websocketHandler = typeof Deno === "object"
       ? Deno?.upgradeWebSocket
       : undefined;
   }
-  fetcher?: ((env?: TEnv | undefined) => ActorFetcher) | undefined;
 
   setWebSocketHandler(
     handler: WebSocketUpgradeHandler,
@@ -165,7 +142,6 @@ export class StdActorRuntime<TEnv extends object = object>
   }
 
   /**
-   * WARNING: THIS FETCH DOES NOT SUPPORT ACTOR VISIBILITY MEANING THAT ALL ACTORS ARE EXPOSED BY DEFAULT AND THERE IS NO WAY TO MAKE THEM PRIVATE
    * Handles an incoming request and invokes the corresponding actor method.
    * @param req - The incoming request.
    * @returns A promise that resolves to the response.
@@ -211,13 +187,11 @@ export class StdActorRuntime<TEnv extends object = object>
       metadata = parsedArgs.metadata;
     }
     try {
-      const res = await silo.invoke(
+      const res = await silo.invoker.invoke(
         actorName,
         methodName,
         args,
         metadata,
-        false,
-        req,
       );
       if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
         if (!this.websocketHandler) {

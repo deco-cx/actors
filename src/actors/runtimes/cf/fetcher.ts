@@ -1,15 +1,13 @@
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
-import type { ActorBase } from "../../mod.ts";
-import type { ActorOptions } from "../../registry.ts";
-import { Registry } from "../../registry.ts";
 import type { ActorConstructor, ActorRuntime } from "../../runtime.ts";
 import { type ActorFetcher, actors } from "../../stub.ts";
 import { ACTOR_ID_HEADER_NAME, type StubFactory } from "../../stubutil.ts";
 import { getActorLocator } from "../../util/locator.ts";
-import { CfActor, defineWebSocketHandler } from "./actorDO.ts";
+import { registerActors } from "./actorDO.ts";
 import { WebSocketWrapper } from "./wsWrapper.ts";
+
 export interface Env extends Record<string, DurableObjectNamespace> {
-  ACTOR_DO?: DurableObjectNamespace;
+  ACTOR_DO: DurableObjectNamespace;
 }
 
 /**
@@ -25,32 +23,8 @@ export class ActorCfRuntime<
   TEnvs extends object = object,
   TActors extends Array<ActorConstructor> = Array<ActorConstructor>,
 > implements ActorRuntime<Env & TEnvs> {
-  /**
-   * Mark an actor as registered.
-   */
-  static Actor(
-    options?: ActorOptions,
-  ): <
-    T extends ActorBase,
-    TConstructor extends ActorConstructor<T>,
-  >(
-    Actor: TConstructor,
-  ) => TConstructor {
-    return <
-      T extends ActorBase,
-      TConstructor extends ActorConstructor<T>,
-    >(
-      Actor: TConstructor,
-    ): TConstructor => {
-      return CfActor(Actor, options) as TConstructor;
-    };
-  }
-
-  constructor(protected actorsConstructors?: TActors) {
-    if (this.actorsConstructors) {
-      Registry.register({}, ...this.actorsConstructors);
-    }
-    defineWebSocketHandler(() => {
+  constructor(protected actorsConstructors: TActors) {
+    registerActors(actorsConstructors, () => {
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
       const originalAccept = server.accept.bind(server);
@@ -81,11 +55,7 @@ export class ActorCfRuntime<
     );
   }
 
-  private getDO(
-    request: Request,
-    env?: Env,
-    ensurePublic: boolean = false,
-  ): DurableObjectStub | undefined {
+  private getDO(request: Request, env?: Env): DurableObjectStub | undefined {
     if (!env) {
       return undefined;
     }
@@ -95,11 +65,6 @@ export class ActorCfRuntime<
       return undefined;
     }
     const actorId = actor.id;
-
-    if (ensurePublic && !Registry.isPublic(actor.name)) {
-      return undefined;
-    }
-
     const doName = toSnakeUpperCase(actor.name);
     const DO = doName in env ? env[doName] : env.ACTOR_DO;
 
@@ -131,7 +96,7 @@ export class ActorCfRuntime<
     };
   }
   fetch(request: Request, env?: Env | undefined): Promise<Response> | Response {
-    const durableObject = this.getDO(request, env, true); // ensure public
+    const durableObject = this.getDO(request, env);
     if (!durableObject) {
       return new Response(`Missing ${ACTOR_ID_HEADER_NAME} or Env`, {
         status: 400,

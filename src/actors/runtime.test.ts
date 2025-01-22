@@ -1,5 +1,4 @@
 import { assertEquals, assertFalse } from "jsr:@std/assert@^1.0.5";
-import { Actor } from "./mod.ts";
 import { StdActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 import { actors } from "./stub.ts";
@@ -7,7 +6,6 @@ import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { WatchTarget } from "./util/watch.ts";
 
 const HELLO_COUNT = 200;
-@Actor()
 class Hello {
   sayHello(): string {
     return "Hello, World!";
@@ -21,8 +19,6 @@ class Hello {
     });
   }
 }
-
-@Actor()
 class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();
@@ -98,13 +94,13 @@ const runServer = (
 };
 
 Deno.test("counter tests", async () => {
-  const rt = new StdActorRuntime();
+  const rt = new StdActorRuntime([Counter, Hello]);
   let reqCount = 0;
   await using _server = runServer(rt, () => {
     reqCount++;
   });
   const actorId = "1234";
-  const counterStub = actors.stub(Counter, { maxWsChunkSize: 64 });
+  const counterStub = actors.stub(Counter, { maxWsChunkSize: 24 });
 
   const counterActor = counterStub.id(actorId);
   using rpcActor = counterStub.id("12345").rpc();

@@ -7,7 +7,6 @@ import {
   type ActorInvoker,
   create,
   createHttpInvoker,
-  type EnrichMetadataFn,
   WELL_KNOWN_RPC_MEHTOD,
 } from "./stubutil.ts";
 import { isUpgrade, makeDuplexChannel } from "./util/channels/channel.ts";
@@ -22,9 +21,6 @@ const KNOWN_METHODS: Record<string, symbol> = {
   "Symbol(Symbol.dispose)": Symbol.dispose,
 };
 
-const WELL_KNOWN_ENRICH_METADATA_METHOD = "enrichMetadata";
-const isWellKnownEnrichMetadataMethod = (methodName: string) =>
-  methodName === WELL_KNOWN_ENRICH_METADATA_METHOD;
 const isWellKnownRPCMethod = (methodName: string) =>
   methodName === WELL_KNOWN_RPC_MEHTOD;
 
@@ -49,9 +45,6 @@ export class ActorSilo<TEnv extends object = object> {
 
   private initializeActors() {
     this.actorsConstructors.forEach((Actor) => {
-      if (this.actors.has(Actor.name)) {
-        return;
-      }
       const storage = this.getActorStorage(this.actorId, Actor.name);
       const state = new ActorState({
         id: this.actorId,
@@ -75,13 +68,12 @@ export class ActorSilo<TEnv extends object = object> {
     });
   }
 
-  public async invoke(
+  private async invoke(
     actorName: string,
     methodName: string,
     args: unknown[],
     metadata: unknown,
-    connect?: boolean,
-    req?: Request,
+    connect?: true,
   ) {
     const actorInstance = this.actors.get(actorName);
     if (!actorInstance) {
@@ -89,25 +81,12 @@ export class ActorSilo<TEnv extends object = object> {
     }
 
     await actorInstance.initialization;
-    actorInstance.actor;
     const method = KNOWN_METHODS[methodName] ?? methodName;
-    metadata = WELL_KNOWN_ENRICH_METADATA_METHOD in actorInstance.actor && req
-      ? await (actorInstance.actor.enrichMetadata as EnrichMetadataFn<unknown>)(
-        metadata,
-        req,
-      )
-      : metadata;
-
     if (isWellKnownRPCMethod(String(method))) {
-      const chan = rpc(this.invoker, metadata);
+      const chan = rpc(this.invoker);
       return chan;
     }
-
-    if (
-      // EnrichMetadata is not supported to be called externally
-      isWellKnownEnrichMetadataMethod(String(method)) ||
-      !(method in actorInstance.actor)
-    ) {
+    if (!(method in actorInstance.actor)) {
       throw new ActorError(
         `method ${methodName} not found on actor ${actorName}`,
         "METHOD_NOT_FOUND",
