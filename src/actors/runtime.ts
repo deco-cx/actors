@@ -228,7 +228,9 @@ export class StdActorRuntime<TEnv extends object = object>
         makeWebSocket(
           socket,
           typeof chunkSize === "string" ? +chunkSize : undefined,
-        ).then((ch) => res(ch)).finally(() => socket.close());
+        ).then((ch) => res(ch)).catch((err) => {
+          console.error(`socket error`, err);
+        }).finally(() => socket.close());
         return response;
       }
       if (isEventStreamResponse(res)) {
