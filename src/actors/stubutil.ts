@@ -211,22 +211,31 @@ export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   : { (...args: Args): Promise<Awaited<Return>> }
   : Actor[key];
 
-export interface BaseMetadata {
-  $request: Request;
-}
-
-type MetadataObject<TMetadata> = TMetadata extends object
-  ? Omit<TMetadata, keyof BaseMetadata>
-  : TMetadata;
+export type EnrichMetadataFn<
+  TMetadata,
+  EnrichedMetadata extends TMetadata = TMetadata,
+> = (
+  metadata: TMetadata,
+  req: Request,
+) => EnrichedMetadata;
 /**
  * Represents an actor proxy.
  */
 export type ActorProxy<Actor> =
   & {
-    [key in keyof Actor]: PromisifyKey<Actor, key>;
+    [key in keyof Omit<Actor, "enrichMetadata" | "metadata">]: PromisifyKey<
+      Actor,
+      key
+    >;
   }
-  & (Actor extends { metadata?: infer TMetadata } ? {
-      withMetadata(metadata: MetadataObject<TMetadata>): ActorProxy<Actor>;
+  & (Actor extends { metadata?: infer TMetadata } ? Actor extends {
+      enrichMetadata: EnrichMetadataFn<infer TPartialMetadata, any>;
+    } ? {
+        withMetadata(metadata: TPartialMetadata): ActorProxy<Actor>;
+        rpc(): ActorProxy<Actor> & Disposable;
+      }
+    : {
+      withMetadata(metadata: TMetadata): ActorProxy<Actor>;
       rpc(): ActorProxy<Actor> & Disposable;
     }
     : { rpc(): ActorProxy<Actor> & Disposable });

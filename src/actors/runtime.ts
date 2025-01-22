@@ -211,11 +211,13 @@ export class StdActorRuntime<TEnv extends object = object>
       metadata = parsedArgs.metadata;
     }
     try {
-      const res = await silo.invoker.invoke(
+      const res = await silo.invoke(
         actorName,
         methodName,
         args,
-        { ...metadata, $request: req },
+        metadata,
+        false,
+        req,
       );
       if (req.headers.get("upgrade") === "websocket" && isUpgrade(res)) {
         if (!this.websocketHandler) {

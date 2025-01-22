@@ -7,6 +7,7 @@ import {
   type ActorInvoker,
   create,
   createHttpInvoker,
+  type EnrichMetadataFn,
   WELL_KNOWN_RPC_MEHTOD,
 } from "./stubutil.ts";
 import { isUpgrade, makeDuplexChannel } from "./util/channels/channel.ts";
@@ -21,6 +22,7 @@ const KNOWN_METHODS: Record<string, symbol> = {
   "Symbol(Symbol.dispose)": Symbol.dispose,
 };
 
+const WELL_KNOWN_ENRICH_METADATA_METHOD = "enrichMetadata";
 const isWellKnownRPCMethod = (methodName: string) =>
   methodName === WELL_KNOWN_RPC_MEHTOD;
 
@@ -71,12 +73,13 @@ export class ActorSilo<TEnv extends object = object> {
     });
   }
 
-  private async invoke(
+  public async invoke(
     actorName: string,
     methodName: string,
     args: unknown[],
     metadata: unknown,
-    connect?: true,
+    connect?: boolean,
+    req?: Request,
   ) {
     const actorInstance = this.actors.get(actorName);
     if (!actorInstance) {
@@ -84,7 +87,14 @@ export class ActorSilo<TEnv extends object = object> {
     }
 
     await actorInstance.initialization;
+    actorInstance.actor;
     const method = KNOWN_METHODS[methodName] ?? methodName;
+    metadata = WELL_KNOWN_ENRICH_METADATA_METHOD in actorInstance.actor && req
+      ? await (actorInstance.actor.enrichMetadata as EnrichMetadataFn<unknown>)(
+        metadata,
+        req,
+      )
+      : metadata;
     if (isWellKnownRPCMethod(String(method))) {
       const chan = rpc(this.invoker, metadata);
       return chan;
