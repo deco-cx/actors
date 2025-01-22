@@ -23,6 +23,8 @@ const KNOWN_METHODS: Record<string, symbol> = {
 };
 
 const WELL_KNOWN_ENRICH_METADATA_METHOD = "enrichMetadata";
+const isWellKnownEnrichMetadataMethod = (methodName: string) =>
+  methodName === WELL_KNOWN_ENRICH_METADATA_METHOD;
 const isWellKnownRPCMethod = (methodName: string) =>
   methodName === WELL_KNOWN_RPC_MEHTOD;
 
@@ -95,11 +97,17 @@ export class ActorSilo<TEnv extends object = object> {
         req,
       )
       : metadata;
+
     if (isWellKnownRPCMethod(String(method))) {
       const chan = rpc(this.invoker, metadata);
       return chan;
     }
-    if (!(method in actorInstance.actor)) {
+
+    if (
+      // EnrichMetadata is not supported to be called externally
+      isWellKnownEnrichMetadataMethod(String(method)) ||
+      !(method in actorInstance.actor)
+    ) {
       throw new ActorError(
         `method ${methodName} not found on actor ${actorName}`,
         "METHOD_NOT_FOUND",
