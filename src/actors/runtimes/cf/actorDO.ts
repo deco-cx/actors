@@ -3,6 +3,8 @@ import type {
   DurableObject,
   DurableObjectState,
 } from "@cloudflare/workers-types";
+import type { ActorOptions } from "../../registry.ts";
+import { Registry } from "../../registry.ts";
 import {
   type Actor,
   type ActorConstructor,
@@ -18,17 +20,14 @@ import {
 import { ACTOR_ID_QS_NAME } from "../../stubutil.ts";
 import type { Env } from "./fetcher.ts";
 
-let REGISTERED_ACTORS: ActorConstructor[] = [];
 let WEBSOCKET_HANDLER: WebSocketUpgradeHandler | undefined;
 
 /**
  * Register actors to be used by the Durable Object.
  */
-export function registerActors(
-  actors: ActorConstructor[],
-  websocketHandler?: WebSocketUpgradeHandler,
+export function defineWebSocketHandler(
+  websocketHandler: WebSocketUpgradeHandler,
 ) {
-  REGISTERED_ACTORS = actors;
   WEBSOCKET_HANDLER = websocketHandler;
 }
 
@@ -47,7 +46,7 @@ export class ActorDurableObject {
     env: Env,
     actors?: ActorConstructor[],
   ) {
-    this.runtime = new StdActorRuntime(actors ?? REGISTERED_ACTORS, env);
+    this.runtime = new StdActorRuntime(env, actors ?? Registry.registered());
     if (WEBSOCKET_HANDLER) {
       this.runtime.setWebSocketHandler(WEBSOCKET_HANDLER);
     }
@@ -73,14 +72,15 @@ export class ActorDurableObject {
 /**
  * A Mixin to add the runtime to a Durable Object.
  */
-export function WithRuntime<T extends Actor>(
+export function CfActor<T extends Actor>(
   Actor: ActorConstructor<T>,
-): DurableObject {
-  return class DurableActor extends ActorDurableObject {
+  options?: ActorOptions,
+): new (state: DurableObjectState, env: Env) => DurableObject {
+  Registry.register(options, Actor);
+  const DurableActor = class extends ActorDurableObject {
     constructor(state: DurableObjectState, env: Env) {
       super(state, env, [Actor]);
     }
-
     async alarm(): Promise<void> {
       const metadata = await this.alarms.retrieveActorMetadata();
       if (!metadata) {
@@ -102,4 +102,6 @@ export function WithRuntime<T extends Actor>(
       }
     }
   };
+  Object.defineProperty(DurableActor, "name", { value: Actor.name });
+  return DurableActor;
 }

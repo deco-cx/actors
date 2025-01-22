@@ -104,7 +104,7 @@ const convertError = (error: unknown) => {
     error,
   };
 };
-export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
+export const rpc = (invoker: ActorInvoker, metadata?: unknown): ChannelUpgrader<
   InvokeResponse,
   InvokeRequest
 > => {
@@ -146,8 +146,17 @@ export const rpc = (invoker: ActorInvoker): ChannelUpgrader<
         }
         continue;
       }
+      const [actorName, methodName, args, meta, connect] = invocation.invoke;
       promises.push(
-        invoker.invoke(...invocation.invoke)
+        invoker.invoke(
+          actorName,
+          methodName,
+          args,
+          typeof metadata === "object" && typeof meta === "object"
+            ? { ...metadata, ...meta }
+            : meta ?? metadata,
+          connect,
+        )
           .then(async (result) => {
             if (isEventStreamResponse(result)) {
               let error: undefined | unknown;

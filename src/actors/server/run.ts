@@ -23,7 +23,7 @@ if (import.meta.main) {
       }
     }
   }
-  const runtime = new StdActorRuntime(actors);
+  const runtime = new StdActorRuntime({}, actors);
 
   typeof Deno !== "undefined" && Deno.serve(runtime);
 }
