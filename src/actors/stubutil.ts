@@ -322,7 +322,7 @@ export const createRPCInvoker = <
       } else if ("stream" in response) {
         if ("end" in response) {
           if ("error" in response && response.error) {
-            await resolver.throw?.(response.error).catch(console.error);
+            await resolver.throw?.(response.error)?.catch(console.error);
           }
           resolver.stream?.close();
           pendingRequests.delete(response.id);
