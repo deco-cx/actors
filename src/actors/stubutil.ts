@@ -394,7 +394,13 @@ export const createRPCInvoker = <
         }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
-        isErrored && resolver?.throw?.(channelClosed);
+        if (isErrored) {
+          console.error(
+            `channel disconnected closing streams and channels`,
+            resolver?.throw !== undefined,
+          );
+          resolver?.throw?.(channelClosed);
+        }
         resolver.stream?.close();
         resolver.ch?.close();
       };
