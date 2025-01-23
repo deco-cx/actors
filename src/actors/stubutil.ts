@@ -279,7 +279,7 @@ type RequestResolver<TResponse> = {
   response: PromiseWithResolvers<TResponse>;
   stream?: Channel<unknown>;
   ch?: DuplexChannel<unknown, unknown>;
-  throw?: (err: unknown) => void;
+  throw?: (err: unknown) => Promise<unknown>;
 };
 export const createRPCInvoker = <
   TResponse,
@@ -331,7 +331,14 @@ export const createRPCInvoker = <
           const it = resolver.stream.recv(channel.signal);
           const retn = it.return;
           it.return = (val) => {
+            resolver?.stream?.close();
             return retn?.call(it, val) ?? val;
+          };
+          const throwf = it.throw;
+          it.throw = async (err) => {
+            const throwIt = await throwf?.call(it, err);
+            resolver?.stream?.close();
+            return throwIt ?? err;
           };
           resolver.throw = it.throw?.bind(it);
           resolver.response.resolve(
@@ -388,19 +395,13 @@ export const createRPCInvoker = <
       const response = Promise.withResolvers<TResponse>();
       const resolver: RequestResolver<TResponse> = { response };
       pendingRequests.set(id, resolver);
-      const cleanup = (isErrored = false) => {
+      const cleanup = async (errored = false) => {
         if (!pendingRequests.has(id)) {
           return;
         }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
-        if (isErrored) {
-          console.error(
-            `channel disconnected closing streams and channels`,
-            resolver?.throw !== undefined,
-          );
-          resolver?.throw?.(channelClosed);
-        }
+        errored && await resolver?.throw?.(channelClosed)?.catch(console.error);
         resolver.stream?.close();
         resolver.ch?.close();
       };
