@@ -321,11 +321,11 @@ export const createRPCInvoker = <
         resolver.ch?.close();
       } else if ("stream" in response) {
         if ("end" in response) {
+          if ("error" in response && response.error) {
+            await resolver.throw?.(response.error).catch(console.error);
+          }
           resolver.stream?.close();
           pendingRequests.delete(response.id);
-          if ("error" in response && response.error) {
-            resolver.throw?.(response.error);
-          }
         } else if ("start" in response) {
           resolver.stream = makeChan();
           const it = resolver.stream.recv(channel.signal);
