@@ -16,6 +16,7 @@ export class Broadcaster<T> implements Channel<T> {
   private subscribers: Map<string, Channel<T>> = new Map();
   private ctrl = new AbortController();
   private closePromise: Promise<void>;
+  private closeReason?: any;
 
   constructor() {
     const { promise, resolve } = Promise.withResolvers<void>();
@@ -56,9 +57,10 @@ export class Broadcaster<T> implements Channel<T> {
   }
 
   notify(value: T): void {
-    if (this.ctrl.signal.aborted) throw ClosedChannelError.instance;
+    if (this.ctrl.signal.aborted) {
+      throw ClosedChannelError.from(this.closeReason);
+    }
 
-    // Send to all subscribers using their sessionId
     this.subscribers.forEach((channel) =>
       channel.send(value).catch(ignoreIfClosed)
     );
@@ -73,9 +75,10 @@ export class Broadcaster<T> implements Channel<T> {
     yield* this.subscribe(signal);
   }
 
-  close(): void {
+  close(reason?: any): void {
+    this.closeReason = reason;
     this.ctrl.abort();
-    this.subscribers.forEach((channel) => channel.close());
+    this.subscribers.forEach((channel) => channel.close(reason));
     this.subscribers.clear();
   }
 }
@@ -86,7 +89,7 @@ export class Broadcaster<T> implements Channel<T> {
 export interface Channel<T> {
   closed: Promise<void>;
   signal: AbortSignal;
-  close(): void;
+  close(reason?: any): void;
   send(value: T): Promise<void>;
   recv(signal?: AbortSignal): AsyncIterableIterator<T>;
 }
@@ -96,8 +99,15 @@ export interface Channel<T> {
  */
 export class ClosedChannelError extends Error {
   static readonly instance = new ClosedChannelError();
-  private constructor() {
-    super("Channel is closed");
+
+  constructor(public readonly reason?: any) {
+    super(reason ? `Channel closed: ${reason}` : "Channel is closed");
+  }
+
+  static from(reason?: any): ClosedChannelError {
+    return reason
+      ? new ClosedChannelError(reason)
+      : ClosedChannelError.instance;
   }
 }
 
@@ -176,11 +186,12 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
   const { promise: closed, resolve: resolveClose } = Promise.withResolvers<
     void
   >();
+  let closeReason: any;
 
   ctrl.signal.addEventListener("abort", () => resolveClose(), { once: true });
 
   const send = (value: T): Promise<void> => {
-    if (ctrl.signal.aborted) throw ClosedChannelError.instance;
+    if (ctrl.signal.aborted) throw ClosedChannelError.from(closeReason);
 
     if (capacity > 0) {
       if (queue.size < capacity) {
@@ -194,7 +205,10 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
     });
   };
 
-  const close = () => ctrl.abort();
+  const close = (reason?: any) => {
+    closeReason = reason;
+    ctrl.abort();
+  };
 
   async function* recv(signal?: AbortSignal): AsyncIterableIterator<T> {
     const linked = signal ? link(ctrl.signal, signal) : ctrl.signal;
@@ -207,6 +221,7 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
       }
     } catch (err) {
       if (!linked.aborted) throw err;
+      if (closeReason !== undefined) throw ClosedChannelError.from(closeReason);
     }
   }
 
