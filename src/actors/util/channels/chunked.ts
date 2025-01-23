@@ -1,5 +1,9 @@
-// deno-lint-ignore-file no-explicit-any
-import { type DuplexChannel, link, makeChan } from "./channel.ts";
+import {
+  type DuplexChannel,
+  link,
+  makeChan,
+  makeDuplexChannelWith,
+} from "./channel.ts";
 
 export const createInitialChunkMessage = (
   messageId: string,
@@ -105,7 +109,7 @@ export const makeChunkedChannel = (
     .withResolvers<Response>();
 
   let responseInitiated = false;
-  let writer: WritableStreamDefaultWriter<any> | undefined;
+  let writer: WritableStreamDefaultWriter | undefined;
 
   const initializeResponse = () => {
     if (!responseInitiated) {
@@ -131,7 +135,7 @@ export const makeChunkedChannel = (
       const currentWriter = initializeResponse();
       await currentWriter.write(message);
     },
-    close: async (reason: any) => {
+    close: async (reason) => {
       if (!responseInitiated) {
         resolveResponse(new Response(null, { status: 204 }));
       }
@@ -178,4 +182,63 @@ export const makeChunkedChannel = (
   })();
 
   return channelPromise;
+};
+
+export interface StreamDuplexChannel<T> extends DuplexChannel<T, T> {
+  readonly readable: ReadableStream<T>;
+  readonly writable: WritableStream<T>;
+}
+
+export const makeStreamChannel = <T>(): StreamDuplexChannel<T> => {
+  const sendChan = makeChan<T>();
+  const recvChan = makeChan<T>();
+
+  // Create streams for sending
+  const { readable, writable: sendWritable } = new TransformStream<T>();
+
+  // Create streams for receiving
+  const { readable: recvReadable, writable } = new TransformStream<T>();
+
+  // Handle writing to the stream
+  (async () => {
+    const writer = sendWritable.getWriter();
+    let err: unknown | undefined = undefined;
+    try {
+      for await (const chunk of sendChan.recv()) {
+        await writer.write(chunk);
+      }
+    } catch (e) {
+      err = e;
+      await writer.abort(err);
+    } finally {
+      !err && await writer.close();
+    }
+  })();
+
+  // Handle reading from the stream
+  (async () => {
+    const reader = recvReadable.getReader();
+    let err: unknown | undefined = undefined;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await recvChan.send(value);
+      }
+    } catch (e) {
+      err = e;
+      await reader.cancel(e);
+    } finally {
+      reader.releaseLock();
+      recvChan.close(err);
+    }
+  })();
+
+  const channel = makeDuplexChannelWith(sendChan, recvChan);
+
+  return {
+    ...channel,
+    readable,
+    writable,
+  };
 };

@@ -13,6 +13,7 @@ import {
   makeDuplexChannelWith,
   makeWebSocket,
 } from "./util/channels/channel.ts";
+import { makeStreamChannel } from "./util/channels/chunked.ts";
 import { retry } from "./util/retry.ts";
 
 export const ACTOR_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
@@ -497,32 +498,14 @@ export const createHttpInvoker = <
           )
         }&${ACTOR_ID_QS_NAME}=${actorId}`);
 
-        const sendChan = makeChan<unknown>();
-        const recvChan = makeChan<unknown>();
-
-        // Create streams for request body with an encoder
-        const { readable: requestReadable, writable: requestWritable } =
-          new TransformStream({
-            transform(chunk, controller) {
-              // Ensure we're sending Uint8Array
-              if (chunk instanceof Uint8Array) {
-                controller.enqueue(chunk);
-              } else {
-                controller.enqueue(
-                  new TextEncoder().encode(JSON.stringify(chunk)),
-                );
-              }
-            },
-          });
-
-        const requestWriter = requestWritable.getWriter();
+        const streamChannel = makeStreamChannel<unknown>();
 
         const fetcher = options?.fetcher?.fetch ?? fetch;
         fetcher(url, {
           credentials: actorsServer?.credentials,
           method: "POST",
           // @ts-expect-error: its ok because deno fetch does not have this but browsers does
-          duplex: "half" as const, // Add this line for browser compatibility
+          duplex: "half" as const,
           headers: {
             "Content-Type": "application/octet-stream",
             "Transfer-Encoding": "chunked",
@@ -531,58 +514,25 @@ export const createHttpInvoker = <
               ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
               : {},
           },
-          body: requestReadable,
-        }).catch((err) => {
-          recvChan.close(err);
-          sendChan.close(err);
-          throw err;
-        }).then(async (response) => {
+          body: streamChannel.readable,
+        }).then((response) => {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
 
-          const reader = response.body?.getReader();
-          if (!reader) {
+          if (!response.body) {
             throw new Error("Response body is null");
           }
 
-          let err: unknown | undefined = undefined;
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              await recvChan.send(value);
-            }
-          } catch (e) {
-            err = e;
-            await reader.cancel(e);
-          } finally {
-            reader.releaseLock();
-            recvChan.close(err);
-          }
+          response.body.pipeTo(streamChannel.writable).catch((err) => {
+            streamChannel.close(err);
+          });
         }).catch((error) => {
-          recvChan.close(error);
+          streamChannel.close(error);
+          throw error;
         });
 
-        // Handle sending data through the request body
-        (async () => {
-          let err: unknown | undefined = undefined;
-          try {
-            for await (const chunk of sendChan.recv()) {
-              await requestWriter.write(chunk);
-            }
-          } catch (e) {
-            err = e;
-            await requestWriter.abort(err);
-          } finally {
-            !err && await requestWriter.close();
-            sendChan.close(err);
-          }
-        })();
-
-        // Create and return the duplex channel
-        const channel = makeDuplexChannelWith(sendChan, recvChan);
-        return channel as TChannel;
+        return streamChannel;
       }
       const abortCtrl = new AbortController();
       const fetcher = options?.fetcher?.fetch ?? fetch;
