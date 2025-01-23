@@ -279,7 +279,7 @@ type RequestResolver<TResponse> = {
   response: PromiseWithResolvers<TResponse>;
   stream?: Channel<unknown>;
   ch?: DuplexChannel<unknown, unknown>;
-  throw?: (err: unknown) => Promise<unknown>;
+  it?: AsyncIterableIterator<unknown>;
 };
 export const createRPCInvoker = <
   TResponse,
@@ -316,13 +316,13 @@ export const createRPCInvoker = <
           err = response.error;
         }
         resolver.response.reject(err);
-        resolver.throw?.(err);
+        resolver.it?.throw?.(err);
         resolver.stream?.close();
         resolver.ch?.close();
       } else if ("stream" in response) {
         if ("end" in response) {
           if ("error" in response && response.error) {
-            await resolver.throw?.(response.error)?.catch?.(console.error);
+            await resolver.it?.throw?.(response.error)?.catch?.(console.error);
           }
           resolver.stream?.close();
           pendingRequests.delete(response.id);
@@ -347,7 +347,7 @@ export const createRPCInvoker = <
             }
           };
 
-          resolver.throw = it.throw?.bind(it);
+          resolver.it = it;
           resolver.response.resolve(
             it as TResponse,
           );
@@ -408,7 +408,7 @@ export const createRPCInvoker = <
         }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
-        errored && resolver?.throw?.(channelClosed)?.catch?.(console.error);
+        errored && resolver?.it?.throw?.(channelClosed)?.catch?.(console.error);
         resolver.stream?.close();
         resolver.ch?.close();
       };
