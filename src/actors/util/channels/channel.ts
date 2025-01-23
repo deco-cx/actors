@@ -101,7 +101,7 @@ export interface Channel<T> {
  * Error thrown when attempting to interact with a closed channel.
  */
 export class ClosedChannelError extends Error {
-  static readonly instance = new ClosedChannelError();
+  static readonly instance: ClosedChannelError = new ClosedChannelError();
 
   constructor(public readonly reason?: any) {
     super(reason ? `Channel closed: ${reason}` : "Channel is closed");

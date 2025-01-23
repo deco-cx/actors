@@ -7,6 +7,7 @@ import type { ActorsOptions, ActorsServer, ActorStub } from "./stub.ts";
 import {
   type Channel,
   type ChannelUpgrader,
+  ClosedChannelError,
   type DuplexChannel,
   makeChan,
   makeDuplexChannelWith,
@@ -406,9 +407,11 @@ export const createRPCInvoker = <
         if (!pendingRequests.has(id)) {
           return;
         }
-        const channelClosed = new Error("Channel closed");
-        response.reject(channelClosed);
-        errored && resolver?.it?.throw?.(channelClosed)?.catch?.(console.error);
+        response.reject(ClosedChannelError.instance);
+        errored &&
+          resolver?.it?.throw?.(ClosedChannelError.instance)?.catch?.(
+            console.error,
+          );
         resolver.stream?.close();
         resolver.ch?.close();
       };
