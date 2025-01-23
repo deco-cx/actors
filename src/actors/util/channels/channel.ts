@@ -76,6 +76,9 @@ export class Broadcaster<T> implements Channel<T> {
   }
 
   close(reason?: any): void {
+    if (this.ctrl.signal.aborted) {
+      return;
+    }
     this.closeReason = reason;
     this.ctrl.abort();
     this.subscribers.forEach((channel) => channel.close(reason));
@@ -206,6 +209,9 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
   };
 
   const close = (reason?: any) => {
+    if (ctrl.signal.aborted) {
+      return;
+    }
     closeReason = reason;
     ctrl.abort();
   };
