@@ -388,17 +388,18 @@ export const createRPCInvoker = <
       const response = Promise.withResolvers<TResponse>();
       const resolver: RequestResolver<TResponse> = { response };
       pendingRequests.set(id, resolver);
-      const cleanup = () => {
+      const cleanup = (isErrored = false) => {
         if (!pendingRequests.has(id)) {
           return;
         }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
+        isErrored && resolver?.throw?.(channelClosed);
         resolver.stream?.close();
         resolver.ch?.close();
       };
       channel.closed.finally(cleanup);
-      channel.disconnected?.finally(cleanup);
+      channel.disconnected?.finally(() => cleanup(true));
 
       try {
         await channel.send({
