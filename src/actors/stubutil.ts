@@ -213,7 +213,13 @@ export type StubOptions<TInstance extends Actor> = ProxyOptions<TInstance>;
 export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive> ? {
-      (...args: Args): DuplexChannel<TReceive, TSend> & { mode?: ConnectMode };
+      (
+        ...args: Args
+      ):
+        & DuplexChannel<TReceive, TSend>
+        & (TReceive extends Uint8Array ? { mode?: ConnectMode }
+          // deno-lint-ignore ban-types
+          : {});
     }
   : { (...args: Args): Promise<Awaited<Return>> }
   : Actor[key];
