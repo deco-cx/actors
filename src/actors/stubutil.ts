@@ -328,29 +328,28 @@ export const createRPCInvoker = <
           pendingRequests.delete(response.id);
         } else if ("start" in response) {
           resolver.stream = makeChan();
-          const it = resolver.stream.recv(channel.signal);
-          const retn = it.return;
-          const throwf = it.throw;
+          const baseIterator = resolver.stream.recv(channel.signal);
 
-          it.return = (val) => {
-            const result = retn?.call(it, val) ?? val;
-            resolver?.stream?.close();
-            return result;
-          };
-
-          it.throw = async (err) => {
-            try {
-              const result = await throwf?.call(it, err);
-              return result ?? err;
-            } finally {
+          const iterator = {
+            next() {
+              return baseIterator.next();
+            },
+            return(value: any) {
               resolver?.stream?.close();
-            }
-          };
+              return baseIterator.return?.(value) ??
+                Promise.resolve({ value, done: true });
+            },
+            throw(err: any) {
+              resolver?.stream?.close();
+              throw err;
+            },
+            [Symbol.asyncIterator]() {
+              return this;
+            },
+          } satisfies AsyncIterableIterator<unknown>;
 
-          resolver.throw = it.throw?.bind(it);
-          resolver.response.resolve(
-            it as TResponse,
-          );
+          resolver.throw = iterator.throw.bind(iterator);
+          resolver.response.resolve(iterator as TResponse);
         } else if (resolver.stream) {
           resolver.stream.send(response.result);
         }
