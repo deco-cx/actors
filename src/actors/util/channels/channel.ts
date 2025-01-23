@@ -246,7 +246,7 @@ export const makeChan = <T>(capacity = 0): Channel<T> => {
 export interface DuplexChannel<TSend, TReceive> extends Disposable {
   send: Channel<TSend>["send"];
   recv: Channel<TReceive>["recv"];
-  close: () => void | Promise<void>;
+  close: (reason?: any) => void | Promise<void>;
   closed: Promise<void>;
   signal: AbortSignal;
   disconnected?: Promise<void>; // used when the channel allows reconnections
@@ -440,9 +440,9 @@ export const makeDuplexChannelWith = <TSend, TReceive>(
     signal: link(sendChan.signal, recvChan.signal),
     send: sendChan.send.bind(sendChan),
     recv: recvChan.recv.bind(recvChan),
-    close: () => {
-      sendChan.close();
-      recvChan.close();
+    close: (reason?: any) => {
+      sendChan.close(reason);
+      recvChan.close(reason);
     },
     [Symbol.dispose]: () => {
       sendChan.close();

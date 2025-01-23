@@ -84,12 +84,12 @@ export class ActorAwaiter<
   [Symbol.dispose](): void {
     this.close();
   }
-  async close() {
+  async close(reason?: any) {
     if (this.ch === null) {
       return;
     }
     const ch = await this.channel;
-    await ch.close();
+    await ch.close(reason);
     this.ch = null;
   }
   get signal() {
@@ -102,12 +102,6 @@ export class ActorAwaiter<
   async *recv(signal?: AbortSignal): AsyncIterableIterator<any> {
     const ch = await this.channel;
     const it = ch.recv(signal);
-    const retn = it.return;
-    it.return = (val) => {
-      ch.close();
-      this.ch = null;
-      return retn?.call(it, val) ?? val;
-    };
     yield* it;
   }
 
@@ -115,12 +109,6 @@ export class ActorAwaiter<
     if (this.ch) {
       return this.ch;
     }
-    const sendChan = makeChan();
-    const recvChan = makeChan();
-    const reliableCh = makeDuplexChannelWith(sendChan, recvChan) as TChannel;
-    const ch = Promise.resolve<TChannel>(reliableCh);
-    this.ch = ch;
-
     const connect = () =>
       this.invoker.invoke(
         this.actorName,
@@ -129,6 +117,15 @@ export class ActorAwaiter<
         this.mMetadata,
         this.mode,
       );
+    if (this.mode === "stream") {
+      return this.ch = connect();
+    }
+    const sendChan = makeChan();
+    const recvChan = makeChan();
+    const reliableCh = makeDuplexChannelWith(sendChan, recvChan) as TChannel;
+    const ch = Promise.resolve<TChannel>(reliableCh);
+    this.ch = ch;
+
     const nextConnection = async () => {
       const ch = await retry(connect, {
         initialDelay: 1e3, // one second of initial delay
@@ -552,6 +549,7 @@ export const createHttpInvoker = <
             }
           } catch (e) {
             err = e;
+            await reader.cancel(e);
           } finally {
             reader.releaseLock();
             recvChan.close(err);
@@ -569,8 +567,9 @@ export const createHttpInvoker = <
             }
           } catch (e) {
             err = e;
+            await requestWriter.abort(err);
           } finally {
-            await requestWriter.close();
+            !err && await requestWriter.close();
             sendChan.close(err);
           }
         })();
