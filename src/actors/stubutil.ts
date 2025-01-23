@@ -322,7 +322,7 @@ export const createRPCInvoker = <
       } else if ("stream" in response) {
         if ("end" in response) {
           if ("error" in response && response.error) {
-            await resolver.throw?.(response.error)?.catch(console.error);
+            await resolver.throw?.(response.error)?.catch?.(console.error);
           }
           resolver.stream?.close();
           pendingRequests.delete(response.id);
@@ -401,7 +401,8 @@ export const createRPCInvoker = <
         }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
-        errored && await resolver?.throw?.(channelClosed)?.catch(console.error);
+        errored &&
+          await resolver?.throw?.(channelClosed)?.catch?.(console.error);
         resolver.stream?.close();
         resolver.ch?.close();
       };
