@@ -521,6 +521,8 @@ export const createHttpInvoker = <
         fetcher(url, {
           credentials: actorsServer?.credentials,
           method: "POST",
+          // @ts-expect-error: its ok because deno fetch does not have this but browsers does
+          duplex: "half" as const, // Add this line for browser compatibility
           headers: {
             "Content-Type": "application/octet-stream",
             "Transfer-Encoding": "chunked",
@@ -530,6 +532,10 @@ export const createHttpInvoker = <
               : {},
           },
           body: requestReadable,
+        }).catch((err) => {
+          recvChan.close(err);
+          sendChan.close(err);
+          throw err;
         }).then(async (response) => {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
