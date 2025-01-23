@@ -13,6 +13,14 @@ class Hello {
     return "Hello, World!";
   }
 
+  chunkedEcho(): ChannelUpgrader<Uint8Array, Uint8Array> {
+    return (async ({ recv, send }) => {
+      for await (const chunk of recv()) {
+        await send(chunk);
+      }
+    });
+  }
+
   chan(name: string): ChannelUpgrader<string, string> {
     return (async ({ send }) => {
       for (let i = 0; i < HELLO_COUNT; i++) {
@@ -108,6 +116,36 @@ Deno.test("counter tests", async () => {
 
   const counterActor = counterStub.id(actorId);
   using rpcActor = counterStub.id("12345").rpc();
+
+  const helloActorChunkedStub = actors.stub(Hello);
+  const actor = helloActorChunkedStub.id("chunked-test");
+
+  // Create test data
+  const testData = new Uint8Array([1, 2, 3, 4, 5]);
+
+  // Get the channel
+  const ch = actor.chunkedEcho();
+  ch.mode = "stream";
+
+  // Set up receiving
+  const received: Uint8Array[] = [];
+  const receivePromise = (async () => {
+    for await (const chunk of ch.recv()) {
+      received.push(chunk as Uint8Array);
+      break;
+    }
+    await ch.close();
+  })();
+
+  // Send the data
+  await ch.send(testData);
+
+  // Wait for all data to be received
+  await receivePromise;
+
+  // Verify the data
+  assertEquals(received.length, 1);
+  assertEquals(received[0], testData);
 
   for (const actor of [rpcActor, counterActor]) {
     const name = `Counter Actor`;

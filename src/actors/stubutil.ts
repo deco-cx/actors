@@ -20,6 +20,7 @@ export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
 export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
 
+export type ConnectMode = "websocket" | "stream";
 export type StubFactory<TInstance> = {
   id: StubFactoryFn<TInstance>;
 };
@@ -56,7 +57,7 @@ export interface ActorInvoker<
     method: string,
     methodArgs: unknown[],
     metadata: unknown,
-    connect: true,
+    connect: ConnectMode,
   ): Promise<TChannel>;
 }
 export class ActorAwaiter<
@@ -67,6 +68,7 @@ export class ActorAwaiter<
     TResponse
   >,
   DuplexChannel<any, any> {
+  mode: ConnectMode = "websocket";
   ch: Promise<TChannel> | null = null;
   ctrl: AbortController;
   _disconnected: PromiseWithResolvers<void> = Promise.withResolvers();
@@ -83,6 +85,9 @@ export class ActorAwaiter<
     this.close();
   }
   async close() {
+    if (this.ch === null) {
+      return;
+    }
     const ch = await this.channel;
     await ch.close();
     this.ch = null;
@@ -122,7 +127,7 @@ export class ActorAwaiter<
         this.actorMethod,
         this.methodArgs,
         this.mMetadata,
-        true,
+        this.mode,
       );
     const nextConnection = async () => {
       const ch = await retry(connect, {
@@ -207,8 +212,9 @@ export type StubOptions<TInstance extends Actor> = ProxyOptions<TInstance>;
 
 export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   (...args: infer Args) => Awaited<infer Return>
-  ? Return extends ChannelUpgrader<infer TSend, infer TReceive>
-    ? { (...args: Args): DuplexChannel<TReceive, TSend> }
+  ? Return extends ChannelUpgrader<infer TSend, infer TReceive> ? {
+      (...args: Args): DuplexChannel<TReceive, TSend> & { mode?: ConnectMode };
+    }
   : { (...args: Args): Promise<Awaited<Return>> }
   : Actor[key];
 
@@ -445,9 +451,15 @@ export const createHttpInvoker = <
   }
   const actorsServer = server ?? _server!;
   return {
-    invoke: async (name, method, methodArgs, metadata, connect?: true) => {
+    invoke: async (
+      name,
+      method,
+      methodArgs,
+      metadata,
+      connect?: ConnectMode,
+    ) => {
       const endpoint = urlFor(actorsServer.url, name, method);
-      if (connect) {
+      if (connect === "websocket") {
         const url = new URL(`${endpoint}?args=${
           encodeURIComponent(
             btoa(
@@ -469,6 +481,97 @@ export const createHttpInvoker = <
           url,
         );
         return makeWebSocket(ws, options?.maxWsChunkSize) as Promise<TChannel>;
+      }
+      if (connect === "stream") {
+        const url = new URL(`${endpoint}?args=${
+          encodeURIComponent(
+            btoa(
+              JSON.stringify({
+                args: methodArgs ?? [],
+                metadata: metadata ?? {},
+              }),
+            ),
+          )
+        }&${ACTOR_ID_QS_NAME}=${actorId}`);
+
+        const sendChan = makeChan<unknown>();
+        const recvChan = makeChan<unknown>();
+
+        // Create streams for request body with an encoder
+        const { readable: requestReadable, writable: requestWritable } =
+          new TransformStream({
+            transform(chunk, controller) {
+              // Ensure we're sending Uint8Array
+              if (chunk instanceof Uint8Array) {
+                controller.enqueue(chunk);
+              } else {
+                controller.enqueue(
+                  new TextEncoder().encode(JSON.stringify(chunk)),
+                );
+              }
+            },
+          });
+
+        const requestWriter = requestWritable.getWriter();
+
+        const fetcher = options?.fetcher?.fetch ?? fetch;
+        fetcher(url, {
+          credentials: actorsServer?.credentials,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "Transfer-Encoding": "chunked",
+            [options?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]: actorId,
+            ...actorsServer.deploymentId
+              ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
+              : {},
+          },
+          body: requestReadable,
+        }).then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error("Response body is null");
+          }
+
+          let err: unknown | undefined = undefined;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              await recvChan.send(value);
+            }
+          } catch (e) {
+            err = e;
+          } finally {
+            reader.releaseLock();
+            recvChan.close(err);
+          }
+        }).catch((error) => {
+          recvChan.close(error);
+        });
+
+        // Handle sending data through the request body
+        (async () => {
+          let err: unknown | undefined = undefined;
+          try {
+            for await (const chunk of sendChan.recv()) {
+              await requestWriter.write(chunk);
+            }
+          } catch (e) {
+            err = e;
+          } finally {
+            await requestWriter.close();
+            sendChan.close(err);
+          }
+        })();
+
+        // Create and return the duplex channel
+        const channel = makeDuplexChannelWith(sendChan, recvChan);
+        return channel as TChannel;
       }
       const abortCtrl = new AbortController();
       const fetcher = options?.fetcher?.fetch ?? fetch;
