@@ -131,13 +131,16 @@ export const makeChunkedChannel = (
       const currentWriter = initializeResponse();
       await currentWriter.write(message);
     },
-    close: () => {
+    close: async (reason: any) => {
       if (!responseInitiated) {
         resolveResponse(new Response(null, { status: 204 }));
       }
+      if (reason) {
+        await writer?.abort(reason).catch(() => {});
+      }
       writer?.close().catch(() => {});
-      sendChan.close();
-      recvChan.close();
+      sendChan.close(reason);
+      recvChan.close(reason);
     },
     [Symbol.dispose]: () => {
       if (!responseInitiated) {
@@ -155,6 +158,7 @@ export const makeChunkedChannel = (
   (async () => {
     if (!req.body) return;
 
+    let err: undefined | unknown = undefined;
     const reader = req.body.getReader();
     try {
       while (true) {
@@ -163,13 +167,13 @@ export const makeChunkedChannel = (
         await recvChan.send(value);
       }
     } catch (error) {
-      console.error("Error reading request body:", error);
+      err = error;
     } finally {
       reader.releaseLock();
       if (!responseInitiated) {
         resolveResponse(new Response(null, { status: 204 }));
       }
-      channel.close();
+      channel.close(err);
     }
   })();
 
