@@ -332,8 +332,8 @@ export const createRPCInvoker = <
           const retn = it.return;
           const throwf = it.throw;
 
-          it.return = async (val) => {
-            const result = await (retn?.call(it, val) ?? val);
+          it.return = (val) => {
+            const result = retn?.call(it, val) ?? val;
             resolver?.stream?.close();
             return result;
           };
@@ -342,9 +342,6 @@ export const createRPCInvoker = <
             try {
               const result = await throwf?.call(it, err);
               return result ?? err;
-            } catch (err) {
-              console.error(`throw error`, err);
-              return err;
             } finally {
               resolver?.stream?.close();
             }
@@ -405,14 +402,13 @@ export const createRPCInvoker = <
       const response = Promise.withResolvers<TResponse>();
       const resolver: RequestResolver<TResponse> = { response };
       pendingRequests.set(id, resolver);
-      const cleanup = async (errored = false) => {
+      const cleanup = (errored = false) => {
         if (!pendingRequests.has(id)) {
           return;
         }
         const channelClosed = new Error("Channel closed");
         response.reject(channelClosed);
-        errored &&
-          await resolver?.throw?.(channelClosed)?.catch?.(console.error);
+        errored && resolver?.throw?.(channelClosed)?.catch?.(console.error);
         resolver.stream?.close();
         resolver.ch?.close();
       };
