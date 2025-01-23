@@ -330,16 +330,26 @@ export const createRPCInvoker = <
           resolver.stream = makeChan();
           const it = resolver.stream.recv(channel.signal);
           const retn = it.return;
-          it.return = (val) => {
-            resolver?.stream?.close();
-            return retn?.call(it, val) ?? val;
-          };
           const throwf = it.throw;
-          it.throw = async (err) => {
-            const throwIt = await throwf?.call(it, err);
+
+          it.return = async (val) => {
+            const result = await (retn?.call(it, val) ?? val);
             resolver?.stream?.close();
-            return throwIt ?? err;
+            return result;
           };
+
+          it.throw = async (err) => {
+            try {
+              const result = await throwf?.call(it, err);
+              return result ?? err;
+            } catch (err) {
+              console.error(`throw error`, err);
+              return err;
+            } finally {
+              resolver?.stream?.close();
+            }
+          };
+
           resolver.throw = it.throw?.bind(it);
           resolver.response.resolve(
             it as TResponse,
