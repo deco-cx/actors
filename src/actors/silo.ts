@@ -5,12 +5,14 @@ import { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import {
   type ActorInvoker,
+  type ConnectMode,
   create,
   createHttpInvoker,
   type EnrichMetadataFn,
   WELL_KNOWN_RPC_MEHTOD,
 } from "./stubutil.ts";
 import { isUpgrade, makeDuplexChannel } from "./util/channels/channel.ts";
+
 // deno-lint-ignore no-explicit-any
 type FunctionType = (...args: any) => any;
 const isInvocable = (f: unknown): f is FunctionType => {
@@ -23,8 +25,10 @@ const KNOWN_METHODS: Record<string, symbol> = {
 };
 
 const WELL_KNOWN_ENRICH_METADATA_METHOD = "enrichMetadata";
+
 const isWellKnownEnrichMetadataMethod = (methodName: string) =>
   methodName === WELL_KNOWN_ENRICH_METADATA_METHOD;
+
 const isWellKnownRPCMethod = (methodName: string) =>
   methodName === WELL_KNOWN_RPC_MEHTOD;
 
@@ -80,7 +84,7 @@ export class ActorSilo<TEnv extends object = object> {
     methodName: string,
     args: unknown[],
     metadata: unknown,
-    connect?: boolean,
+    connect?: ConnectMode,
     req?: Request,
   ) {
     const actorInstance = this.actors.get(actorName);
