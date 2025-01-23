@@ -343,7 +343,7 @@ export const createRPCInvoker = <
               const result = throwf?.call(it, err);
               return result ?? err;
             } finally {
-              resolver?.stream?.close();
+              resolver?.stream?.close(err);
             }
           };
 
