@@ -20,7 +20,6 @@ import {
 } from "./stubutil.ts";
 import { serializeUint8Array } from "./util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "./util/channels/channel.ts";
-import { isChunked, makeChunkedChannel } from "./util/channels/chunked.ts";
 import { getActorLocator } from "./util/locator.ts";
 import {
   type ServerSentEventMessage,
@@ -35,6 +34,10 @@ export interface ActorRuntime<TEnv extends object = object> {
   fetcher?: (env?: TEnv) => ActorFetcher;
 }
 
+function isFormData(request: Request) {
+  const contentType = request.headers.get("Content-Type") || "";
+  return contentType.includes("multipart/form-data");
+}
 /**
  * Represents an actor.
  */
@@ -203,6 +206,12 @@ export class StdActorRuntime<TEnv extends object = object>
         .json()) as any;
       args = margs;
       metadata = maybeMetadata;
+    } else if (isFormData(req)) {
+      const formData = await req.formData();
+      const file = formData.get("file") as File;
+      metadata = JSON.parse(formData.get("metadata") as string ?? "{}");
+      args = JSON.parse(formData.get("args") as string ?? "[]");
+      args = [file.stream(), ...args];
     } else if (url.searchParams.get("args")) {
       const qargs = url.searchParams.get("args");
 
@@ -221,32 +230,23 @@ export class StdActorRuntime<TEnv extends object = object>
         undefined,
         req,
       );
-      if (isUpgrade(res)) {
-        if (req.headers.get("upgrade") === "websocket") {
-          if (!this.websocketHandler) {
-            return new Response("WebSockets are not supported", {
-              status: 400,
-            });
-          }
-          const { socket, response } = await this.websocketHandler(req);
-          const chunkSize = url.searchParams.get(ACTOR_MAX_CHUNK_SIZE_QS_NAME);
-          makeWebSocket(
-            socket,
-            typeof chunkSize === "string" ? +chunkSize : undefined,
-          ).then((ch) => res(ch)).catch((err) => {
-            console.error(`socket error`, err);
-          }).finally(() => socket.close());
-          return response;
-        } else if (isChunked(req)) {
-          const { ch, res: response } = await makeChunkedChannel(req);
-          Promise.resolve(res(ch)).catch((err) => {
-            console.error(`chunked channel error`, err);
-          }).finally(() => ch.close());
-          return response;
-        } else {
-          return new Response("upgrade not supported", { status: 400 });
+      if (isUpgrade(res) && req.headers.get("upgrade") === "websocket") {
+        if (!this.websocketHandler) {
+          return new Response("WebSockets are not supported", {
+            status: 400,
+          });
         }
+        const { socket, response } = await this.websocketHandler(req);
+        const chunkSize = url.searchParams.get(ACTOR_MAX_CHUNK_SIZE_QS_NAME);
+        makeWebSocket(
+          socket,
+          typeof chunkSize === "string" ? +chunkSize : undefined,
+        ).then((ch) => res(ch)).catch((err) => {
+          console.error(`socket error`, err);
+        }).finally(() => socket.close());
+        return response;
       }
+
       if (isEventStreamResponse(res)) {
         req.signal.onabort = () => {
           res?.return?.();

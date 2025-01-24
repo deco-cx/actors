@@ -13,7 +13,7 @@ import {
   makeDuplexChannelWith,
   makeWebSocket,
 } from "./util/channels/channel.ts";
-import { makeStreamChannel } from "./util/channels/chunked.ts";
+import { readAsBytes } from "./util/channels/chunked.ts";
 import { retry } from "./util/retry.ts";
 
 export const ACTOR_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
@@ -21,7 +21,6 @@ export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
 export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
 export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
 
-export type ConnectMode = "websocket" | "stream";
 export type StubFactory<TInstance> = {
   id: StubFactoryFn<TInstance>;
 };
@@ -58,7 +57,7 @@ export interface ActorInvoker<
     method: string,
     methodArgs: unknown[],
     metadata: unknown,
-    connect: ConnectMode,
+    connect: true,
   ): Promise<TChannel>;
 }
 export class ActorAwaiter<
@@ -69,7 +68,6 @@ export class ActorAwaiter<
     TResponse
   >,
   DuplexChannel<any, any> {
-  mode: ConnectMode = "websocket";
   ch: Promise<TChannel> | null = null;
   ctrl: AbortController;
   _disconnected: PromiseWithResolvers<void> = Promise.withResolvers();
@@ -116,11 +114,8 @@ export class ActorAwaiter<
         this.actorMethod,
         this.methodArgs,
         this.mMetadata,
-        this.mode,
+        true,
       );
-    if (this.mode === "stream") {
-      return this.ch = connect();
-    }
     const sendChan = makeChan();
     const recvChan = makeChan();
     const reliableCh = makeDuplexChannelWith(sendChan, recvChan) as TChannel;
@@ -213,11 +208,7 @@ export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive> ? {
       (
         ...args: Args
-      ):
-        & DuplexChannel<TReceive, TSend>
-        & (TReceive extends Uint8Array ? { mode?: ConnectMode }
-          // deno-lint-ignore ban-types
-          : {});
+      ): DuplexChannel<TReceive, TSend>;
     }
   : { (...args: Args): Promise<Awaited<Return>> }
   : Actor[key];
@@ -460,10 +451,10 @@ export const createHttpInvoker = <
       method,
       methodArgs,
       metadata,
-      connect?: ConnectMode,
+      connect?: true,
     ) => {
       const endpoint = urlFor(actorsServer.url, name, method);
-      if (connect === "websocket") {
+      if (connect) {
         const url = new URL(`${endpoint}?args=${
           encodeURIComponent(
             btoa(
@@ -486,53 +477,29 @@ export const createHttpInvoker = <
         );
         return makeWebSocket(ws, options?.maxWsChunkSize) as Promise<TChannel>;
       }
-      if (connect === "stream") {
-        const url = new URL(`${endpoint}?args=${
-          encodeURIComponent(
-            btoa(
-              JSON.stringify({
-                args: methodArgs ?? [],
-                metadata: metadata ?? {},
-              }),
-            ),
-          )
-        }&${ACTOR_ID_QS_NAME}=${actorId}`);
-
-        const streamChannel = makeStreamChannel<unknown>();
-
-        const fetcher = options?.fetcher?.fetch ?? fetch;
-        fetcher(url, {
-          credentials: actorsServer?.credentials,
-          method: "POST",
-          // @ts-expect-error: its ok because deno fetch does not have this but browsers does
-          duplex: "half" as const,
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "Transfer-Encoding": "chunked",
-            [options?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]: actorId,
-            ...actorsServer.deploymentId
-              ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
-              : {},
-          },
-          body: streamChannel.readable,
-        }).then((response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          if (!response.body) {
-            throw new Error("Response body is null");
-          }
-
-          response.body.pipeTo(streamChannel.writable).catch((err) => {
-            streamChannel.close(err);
-          });
-        }).catch((error) => {
-          streamChannel.close(error);
-          throw error;
+      let body: BodyInit | null | undefined, contentType: string | undefined;
+      if (
+        Array.isArray(methodArgs) && methodArgs[0] &&
+          methodArgs[0] instanceof ReadableStream ||
+        methodArgs[0] instanceof Uint8Array
+      ) {
+        const [stream, ...rest] = methodArgs;
+        body = new FormData();
+        const blob = new Blob([await readAsBytes(stream)], {
+          type: "application/octet-stream",
         });
-
-        return streamChannel;
+        body.append("file", blob);
+        body.append("metadata", JSON.stringify(metadata ?? {}));
+        body.append("args", JSON.stringify(rest ?? []));
+      } else {
+        body = JSON.stringify(
+          {
+            args: methodArgs ?? [],
+            metadata: metadata ?? {},
+          },
+          (_key, value) => typeof value === "bigint" ? value.toString() : value, // return everything else unchanged
+        );
+        contentType = "application/json";
       }
       const abortCtrl = new AbortController();
       const fetcher = options?.fetcher?.fetch ?? fetch;
@@ -543,20 +510,13 @@ export const createHttpInvoker = <
           signal: abortCtrl.signal,
           credentials: actorsServer?.credentials,
           headers: {
-            "Content-Type": "application/json",
+            ...contentType ? { "Content-Type": contentType } : {},
             [options?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]: actorId,
             ...actorsServer.deploymentId
               ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
               : {},
           },
-          body: JSON.stringify(
-            {
-              args: methodArgs ?? [],
-              metadata: metadata ?? {},
-            },
-            (_key, value) =>
-              typeof value === "bigint" ? value.toString() : value, // return everything else unchanged
-          ),
+          body,
         },
       );
       if (!resp.ok) {
