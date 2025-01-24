@@ -277,6 +277,13 @@ export class StdActorRuntime<TEnv extends object = object>
           },
         );
       }
+      if (res instanceof ReadableStream) {
+        return new Response(res, {
+          headers: {
+            "content-type": "application/octet-stream",
+          },
+        });
+      }
       if (typeof res === "undefined" || res === null) {
         return new Response(null, { status: 204 });
       }
