@@ -1,10 +1,3 @@
-import {
-  type DuplexChannel,
-  link,
-  makeChan,
-  makeDuplexChannelWith,
-} from "./channel.ts";
-
 export const createInitialChunkMessage = (
   messageId: string,
   totalChunks: number,
@@ -88,157 +81,30 @@ export interface ChunkBuffer {
   totalSize: number;
 }
 
-export const isChunked = (req: Request): boolean => {
-  return req.headers.get("transfer-encoding") === "chunked" ||
-    req.headers.get("x-transfer-encoding") === "chunked";
-};
-export interface ChunkedChannel {
-  ch: DuplexChannel<Uint8Array, Uint8Array>;
-  res: Promise<Response>;
+export async function readAsBytes(
+  readable: ReadableStream<Uint8Array> | Uint8Array,
+): Promise<Uint8Array> {
+  if (readable instanceof Uint8Array) {
+    return readable;
+  }
+  const reader = readable.getReader();
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+
+  // Combine all chunks
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const combinedArray = new Uint8Array(totalLength);
+  let position = 0;
+
+  for (const chunk of chunks) {
+    combinedArray.set(chunk, position);
+    position += chunk.length;
+  }
+
+  return combinedArray;
 }
-
-export const makeChunkedChannel = (
-  req: Request,
-): Promise<ChunkedChannel> => {
-  const sendChan = makeChan<Uint8Array>();
-  const recvChan = makeChan<Uint8Array>();
-  const { promise: channelPromise, resolve: resolveChannel } = Promise
-    .withResolvers<ChunkedChannel>();
-
-  const { promise: responsePromise, resolve: resolveResponse } = Promise
-    .withResolvers<Response>();
-
-  let responseInitiated = false;
-  let writer: WritableStreamDefaultWriter | undefined;
-
-  const initializeResponse = () => {
-    if (!responseInitiated) {
-      const { readable, writable } = new TransformStream();
-      const response = new Response(readable, {
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "Transfer-Encoding": "chunked",
-        },
-      });
-      writer = writable.getWriter();
-      responseInitiated = true;
-      resolveResponse(response);
-    }
-    return writer!;
-  };
-
-  const channel: DuplexChannel<Uint8Array, Uint8Array> = {
-    closed: Promise.race([recvChan.closed, sendChan.closed]),
-    signal: link(recvChan.signal, sendChan.signal),
-    recv: recvChan.recv.bind(recvChan),
-    send: async (message: Uint8Array) => {
-      const currentWriter = initializeResponse();
-      await currentWriter.write(message);
-    },
-    close: async (reason) => {
-      if (!responseInitiated) {
-        resolveResponse(new Response(null, { status: 204 }));
-      }
-      if (reason) {
-        await writer?.abort(reason).catch(() => {});
-      }
-      writer?.close().catch(() => {});
-      sendChan.close(reason);
-      recvChan.close(reason);
-    },
-    [Symbol.dispose]: () => {
-      if (!responseInitiated) {
-        resolveResponse(new Response(null, { status: 204 }));
-      }
-      writer?.close();
-      sendChan.close();
-      recvChan.close();
-    },
-  };
-
-  resolveChannel({ ch: channel, res: responsePromise });
-
-  // Handle request body
-  (async () => {
-    if (!req.body) return;
-
-    let err: undefined | unknown = undefined;
-    const reader = req.body.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        await recvChan.send(value);
-      }
-    } catch (error) {
-      err = error;
-    } finally {
-      reader.releaseLock();
-      if (!responseInitiated) {
-        resolveResponse(new Response(null, { status: 204 }));
-      }
-      channel.close(err);
-    }
-  })();
-
-  return channelPromise;
-};
-
-export interface StreamDuplexChannel<T> extends DuplexChannel<T, T> {
-  readonly readable: ReadableStream<T>;
-  readonly writable: WritableStream<T>;
-}
-
-export const makeStreamChannel = <T>(): StreamDuplexChannel<T> => {
-  const sendChan = makeChan<T>();
-  const recvChan = makeChan<T>();
-
-  // Create streams for sending
-  const { readable, writable: sendWritable } = new TransformStream<T>();
-
-  // Create streams for receiving
-  const { readable: recvReadable, writable } = new TransformStream<T>();
-
-  // Handle writing to the stream
-  (async () => {
-    const writer = sendWritable.getWriter();
-    let err: unknown | undefined = undefined;
-    try {
-      for await (const chunk of sendChan.recv()) {
-        await writer.write(chunk);
-      }
-    } catch (e) {
-      err = e;
-      await writer.abort(err);
-    } finally {
-      !err && await writer.close();
-    }
-  })();
-
-  // Handle reading from the stream
-  (async () => {
-    const reader = recvReadable.getReader();
-    let err: unknown | undefined = undefined;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        await recvChan.send(value);
-      }
-    } catch (e) {
-      err = e;
-      await reader.cancel(e);
-    } finally {
-      reader.releaseLock();
-      recvChan.close(err);
-    }
-  })();
-
-  const channel = makeDuplexChannelWith(sendChan, recvChan);
-
-  return {
-    ...channel,
-    readable,
-    writable,
-  };
-};

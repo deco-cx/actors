@@ -5,7 +5,6 @@ import { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import {
   type ActorInvoker,
-  type ConnectMode,
   create,
   createHttpInvoker,
   type EnrichMetadataFn,
@@ -84,7 +83,7 @@ export class ActorSilo<TEnv extends object = object> {
     methodName: string,
     args: unknown[],
     metadata: unknown,
-    connect?: ConnectMode,
+    connect?: true,
     req?: Request,
   ) {
     const actorInstance = this.actors.get(actorName);

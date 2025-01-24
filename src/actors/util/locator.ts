@@ -20,6 +20,7 @@ export const getActorLocator = (
   if (reqOrUrl instanceof URL && req instanceof Request) {
     const id = req.headers.get(ACTOR_ID_HEADER_NAME) ??
       reqOrUrl.searchParams.get(ACTOR_ID_QS_NAME);
+
     const maybeActorNameAndMethod = actorNameAndMethod(reqOrUrl.pathname);
     if (!maybeActorNameAndMethod) {
       return null;

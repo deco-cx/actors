@@ -4,6 +4,7 @@ import { StdActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
 import { actors } from "./stub.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
+import { readAsBytes } from "./util/channels/chunked.ts";
 import { WatchTarget } from "./util/watch.ts";
 
 const HELLO_COUNT = 200;
@@ -12,13 +13,12 @@ class Hello {
   sayHello(): string {
     return "Hello, World!";
   }
-
-  chunkedEcho(): ChannelUpgrader<Uint8Array, Uint8Array> {
-    return (async ({ recv, send }) => {
-      for await (const chunk of recv()) {
-        await send(chunk);
-      }
-    });
+  async uploadText(
+    stream: ReadableStream<Uint8Array>,
+    arg: string,
+  ): Promise<string> {
+    const bytes = await readAsBytes(stream);
+    return new TextDecoder().decode(bytes) + arg;
   }
 
   chan(name: string): ChannelUpgrader<string, string> {
@@ -117,35 +117,19 @@ Deno.test("counter tests", async () => {
   const counterActor = counterStub.id(actorId);
   using rpcActor = counterStub.id("12345").rpc();
 
-  const helloActorChunkedStub = actors.stub(Hello);
-  const actor = helloActorChunkedStub.id("chunked-test");
+  const helloUploadActor = actors.stub(Hello).id("123456");
 
-  // Create test data
-  const testData = new Uint8Array([1, 2, 3, 4, 5]);
+  // Test file upload
+  const testData = new TextEncoder().encode("Hello ");
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(testData);
+      controller.close();
+    },
+  });
 
-  // Get the channel
-  const ch = actor.chunkedEcho();
-  ch.mode = "stream";
-
-  // Set up receiving
-  const received: Uint8Array[] = [];
-  const receivePromise = (async () => {
-    for await (const chunk of ch.recv()) {
-      received.push(chunk as Uint8Array);
-      break;
-    }
-    await ch.close();
-  })();
-
-  // Send the data
-  await ch.send(testData);
-
-  // Wait for all data to be received
-  await receivePromise;
-
-  // Verify the data
-  assertEquals(received.length, 1);
-  assertEquals(received[0], testData);
+  const result = await helloUploadActor.uploadText(stream, "world");
+  assertEquals(result, "Hello world");
 
   for (const actor of [rpcActor, counterActor]) {
     const name = `Counter Actor`;
