@@ -220,6 +220,10 @@ export type EnrichMetadataFn<
   metadata: TMetadata,
   req: Request,
 ) => EnrichedMetadata;
+
+export interface BaseMetadata {
+  signal?: AbortSignal;
+}
 /**
  * Represents an actor proxy.
  */
@@ -233,11 +237,15 @@ export type ActorProxy<Actor> =
   & (Actor extends { metadata?: infer TMetadata } ? Actor extends {
       enrichMetadata: EnrichMetadataFn<infer TPartialMetadata, any>;
     } ? {
-        withMetadata(metadata: TPartialMetadata): ActorProxy<Actor>;
+        withMetadata(
+          metadata: Omit<TPartialMetadata, keyof BaseMetadata>,
+        ): ActorProxy<Actor>;
         rpc(): ActorProxy<Actor> & Disposable;
       }
     : {
-      withMetadata(metadata: TMetadata): ActorProxy<Actor>;
+      withMetadata(
+        metadata: Omit<TMetadata, keyof BaseMetadata>,
+      ): ActorProxy<Actor>;
       rpc(): ActorProxy<Actor> & Disposable;
     }
     : { rpc(): ActorProxy<Actor> & Disposable });

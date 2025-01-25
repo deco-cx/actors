@@ -5,6 +5,7 @@ import { ActorState } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import {
   type ActorInvoker,
+  type BaseMetadata,
   create,
   createHttpInvoker,
   type EnrichMetadataFn,
@@ -101,6 +102,9 @@ export class ActorSilo<TEnv extends object = object> {
       )
       : metadata;
 
+    if (metadata && typeof metadata === "object") {
+      (metadata as BaseMetadata).signal = req?.signal;
+    }
     if (isWellKnownRPCMethod(String(method))) {
       const chan = rpc(this.invoker, metadata);
       return chan;

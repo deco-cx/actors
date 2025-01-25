@@ -34,7 +34,8 @@ class Hello {
 class Counter {
   private count: number;
   private watchTarget = new WatchTarget<number>();
-  public metadata?: { extraSum: number };
+  public metadata?: { extraSum: number; signal?: AbortSignal };
+  private listenerAttached = Promise.withResolvers<void>();
 
   constructor(protected state: ActorState) {
     this.count = 0;
@@ -43,6 +44,17 @@ class Counter {
     });
   }
 
+  waitForAbortSignalAttach() {
+    return this.listenerAttached.promise;
+  }
+  shouldFailWhenSignalIsAborted() {
+    const p = Promise.withResolvers<string>();
+    this.metadata?.signal?.addEventListener("abort", () => {
+      p.resolve("HELLO ITS RESOLVED!");
+    }, { once: true });
+    this.listenerAttached.resolve();
+    return p.promise;
+  }
   callSayHello(): Promise<string> {
     const hello = this.state.stub(Hello).id(this.state.id);
     return hello.sayHello();
@@ -105,16 +117,37 @@ const runServer = (
   };
 };
 
-Deno.test("counter tests", async () => {
+Deno.test("actor tests", async () => {
   const rt = new StdActorRuntime();
   let reqCount = 0;
-  await using _server = runServer(rt, () => {
+
+  let nextRequest = Promise.withResolvers<() => void>();
+
+  let abortRequestFn = nextRequest.promise;
+  await using _server = runServer(rt, (rq) => {
     reqCount++;
+    nextRequest.resolve(() => {
+      rq.signal.dispatchEvent(new Event("abort"));
+    });
+    nextRequest = Promise.withResolvers<() => void>();
+    abortRequestFn = nextRequest.promise;
   });
   const actorId = "1234";
   const counterStub = actors.stub(Counter, { maxWsChunkSize: 64 });
 
   const counterActor = counterStub.id(actorId);
+
+  const waitForAttach = counterActor.waitForAbortSignalAttach().then((p) => p);
+  await nextRequest.promise;
+  const shouldReturnHelloOnlyWhenAborted = counterActor
+    .shouldFailWhenSignalIsAborted().then(
+      (p) => p,
+    );
+  const abort = await abortRequestFn;
+  await waitForAttach;
+  abort();
+  assertEquals(await shouldReturnHelloOnlyWhenAborted, "HELLO ITS RESOLVED!");
+
   using rpcActor = counterStub.id("12345").rpc();
 
   const helloUploadActor = actors.stub(Hello).id("123456");
