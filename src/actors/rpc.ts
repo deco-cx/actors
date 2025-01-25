@@ -108,7 +108,7 @@ export const rpc = (invoker: ActorInvoker, metadata?: unknown): ChannelUpgrader<
   InvokeResponse,
   InvokeRequest
 > => {
-  return async ({ send, recv }) => {
+  return async ({ send, recv, signal }) => {
     const promises: Promise<void>[] = [];
     const streams: Map<string, AsyncIterableIterator<any>> = new Map();
     const channels: Map<string, DuplexChannel<any, any>> = new Map();
@@ -153,7 +153,7 @@ export const rpc = (invoker: ActorInvoker, metadata?: unknown): ChannelUpgrader<
           methodName,
           args,
           typeof metadata === "object" && typeof meta === "object"
-            ? { ...metadata, ...meta }
+            ? { signal, ...metadata, ...meta }
             : meta ?? metadata,
           connect,
         )

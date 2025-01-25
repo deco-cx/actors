@@ -102,14 +102,14 @@ export class ActorSilo<TEnv extends object = object> {
       )
       : metadata;
 
-    if (metadata && typeof metadata === "object") {
-      (metadata as BaseMetadata).signal = req?.signal;
-    }
     if (isWellKnownRPCMethod(String(method))) {
       const chan = rpc(this.invoker, metadata);
       return chan;
     }
 
+    if (metadata && typeof metadata === "object" && req) {
+      (metadata as BaseMetadata).signal = req?.signal;
+    }
     if (
       // EnrichMetadata is not supported to be called externally
       isWellKnownEnrichMetadataMethod(String(method)) ||
