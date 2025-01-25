@@ -398,9 +398,10 @@ export const createRPCInvoker = <
     }
   })();
 
+  let seq = 0;
   return {
     invoke: async (name, method, methodArgs, metadata, connect) => {
-      const id = crypto.randomUUID();
+      const id = `${++seq}`; // we support "only" ~9 quadrillion of messages in a single socket, looks good though :)
       const response = Promise.withResolvers<TResponse>();
       const resolver: RequestResolver<TResponse> = { response };
       pendingRequests.set(id, resolver);
