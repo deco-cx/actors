@@ -338,6 +338,13 @@ export const createRPCInvoker = <
           pendingRequests.delete(response.id);
         } else if ("start" in response) {
           resolver.stream = makeChan();
+          resolver.stream.closed.finally(() => {
+            pendingRequests.delete(response.id);
+            channel.send({
+              id: response.id,
+              cancelStream: true,
+            });
+          });
           const it = resolver.stream.recv(channel.signal);
           const retn = it.return;
           const throwf = it.throw;
