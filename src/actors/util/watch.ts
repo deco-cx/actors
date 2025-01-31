@@ -4,6 +4,7 @@ export type {
   ChannelUpgrader,
   DuplexChannel,
 } from "./channels/channel.ts";
+export { Queue } from "./channels/queue.ts";
 export { ClosedChannelError };
 
 export class WatchTarget<T> extends Broadcaster<T> {}
