@@ -2,7 +2,7 @@
   "name": "@deco/actors",
   "exports": {
     ".": "./src/actors/mod.ts",
-    "./hono": "./src/actors/hono/middleware.ts",
+    "./hono": "./src/actors/hono/route.ts",
     "./proxy": "./src/actors/stub.ts",
     "./stub": "./src/actors/stub.ts",
     "./watch": "./src/actors/util/watch.ts",
@@ -27,11 +27,11 @@
     ]
   },
   "imports": {
-    "@hono/hono": "jsr:@hono/hono@^4.6.2"
+    "@hono/hono": "jsr:@hono/hono@^4.6.20"
   },
   "tasks": {
     "check": "deno fmt && deno lint --fix && deno check ./src/actors/mod.ts ./src/actors/hono/middleware.ts",
-    "test": "rm kv;deno test -A --unstable-kv --env .",
+    "test": "rm kv;PORT=8001 deno test -A --unstable-kv --env .",
     "release": "deno run -A jsr:@deco/scripts/release"
   },
   "fmt": {

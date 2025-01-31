@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from "@hono/hono";
+import type { Handler } from "@hono/hono";
 import process from "node:process";
 import { RUNTIME } from "../discover.ts";
 import type { ActorRuntime } from "../runtime.ts";
@@ -10,7 +10,7 @@ import type { ActorRuntime } from "../runtime.ts";
 export const withActors = <TEnv extends object = object>(
   fetcher: ActorRuntime<TEnv> = RUNTIME,
   basePath = "/actors",
-): MiddlewareHandler<{ Bindings: TEnv }> => {
+): Handler<{ Bindings: TEnv }> => {
   return async (ctx, next) => {
     const path = ctx.req.path;
     if (!path.startsWith(basePath)) {

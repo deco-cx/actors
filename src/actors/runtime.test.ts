@@ -106,9 +106,12 @@ const runServer = (
   rt: StdActorRuntime,
   onReq?: (req: Request) => void,
 ): AsyncDisposable => {
-  const server = Deno.serve((req) => {
-    onReq?.(req);
-    return rt.fetch(req);
+  const server = Deno.serve({
+    port: 8001,
+    handler: (req) => {
+      onReq?.(req);
+      return rt.fetch(req);
+    },
   });
   return {
     async [Symbol.asyncDispose]() {

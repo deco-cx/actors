@@ -16,6 +16,6 @@
   },
   "dependencies": {
     "@deco/actors": "npm:@jsr/deco__actors@^0.25.0-beta.8",
-    "hono": "^4.6.12"
+    "hono": "^4.6.20"
   }
 }
