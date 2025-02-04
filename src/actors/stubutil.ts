@@ -204,7 +204,7 @@ export interface ProxyOptions<TInstance extends Actor> {
 export type StubOptions<TInstance extends Actor> = ProxyOptions<TInstance>;
 
 export type PromisifyKey<Actor, key extends keyof Actor> = Actor[key] extends
-  (...args: infer Args) => Awaited<infer Return>
+  (...args: infer Args) => Awaited<infer Return> | Promise<infer Return>
   ? Return extends ChannelUpgrader<infer TSend, infer TReceive> ? {
       (
         ...args: Args
