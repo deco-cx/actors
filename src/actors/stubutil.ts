@@ -123,12 +123,13 @@ export class ActorAwaiter<
     const ch = Promise.resolve<TChannel>(reliableCh);
     this.ch = ch;
 
-    const nextConnection = async (): Promise<void> => {
+    const nextConnection = async (onConnected?: () => void): Promise<void> => {
       const ch = await retry(connect, {
         initialDelay: 1e3, // one second of initial delay
         maxAttempts: 30, // 30 attempts
         maxDelay: 10e3, // 10 seconds max delay
       });
+      onConnected?.();
       const recvLoop = async () => {
         for await (const val of ch.recv(reliableCh.signal)) {
           recvChan.send(val);
@@ -147,9 +148,7 @@ export class ActorAwaiter<
         prev.resolve({ reconnected: reconnected.promise });
         console.error("channel closed, retrying...");
         await new Promise((resolve) => setTimeout(resolve, 2e3)); // retrying in 2 second
-        return nextConnection().then(reconnected.resolve).catch(
-          reconnected.reject,
-        );
+        return nextConnection(reconnected.resolve).catch(reconnected.reject);
       }
       ch.close();
       this.ch = null;
