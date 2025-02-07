@@ -252,7 +252,7 @@ export interface DuplexChannel<TSend, TReceive> extends Disposable {
   close: (reason?: any) => void | Promise<void>;
   closed: Promise<void>;
   signal: AbortSignal;
-  disconnected?: Promise<Promise<void>>; // used when the channel allows reconnections, it returns a promise that resolves when the channel is reconnected
+  disconnected?: Promise<{ reconnected: Promise<void> }>; // used when the channel allows reconnections, it returns a promise that resolves when the channel is reconnected
 }
 
 /**

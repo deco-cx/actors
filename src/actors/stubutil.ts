@@ -70,7 +70,8 @@ export class ActorAwaiter<
   DuplexChannel<any, any> {
   ch: Promise<TChannel> | null = null;
   ctrl: AbortController;
-  _disconnected: PromiseWithResolvers<Promise<void>> = Promise.withResolvers();
+  _disconnected: PromiseWithResolvers<{ reconnected: Promise<void> }> = Promise
+    .withResolvers();
   constructor(
     protected actorName: string,
     protected actorMethod: string,
@@ -143,7 +144,7 @@ export class ActorAwaiter<
         const prev = this._disconnected;
         this._disconnected = Promise.withResolvers();
         const reconnected = Promise.withResolvers<void>();
-        prev.resolve(reconnected.promise);
+        prev.resolve({ reconnected: reconnected.promise });
         console.error("channel closed, retrying...");
         await new Promise((resolve) => setTimeout(resolve, 2e3)); // retrying in 2 second
         return nextConnection().then(reconnected.resolve).catch(
