@@ -70,7 +70,7 @@ export class ActorAwaiter<
   DuplexChannel<any, any> {
   ch: Promise<TChannel> | null = null;
   ctrl: AbortController;
-  _disconnected: PromiseWithResolvers<void> = Promise.withResolvers();
+  _disconnected: PromiseWithResolvers<Promise<void>> = Promise.withResolvers();
   constructor(
     protected actorName: string,
     protected actorMethod: string,
@@ -122,7 +122,7 @@ export class ActorAwaiter<
     const ch = Promise.resolve<TChannel>(reliableCh);
     this.ch = ch;
 
-    const nextConnection = async () => {
+    const nextConnection = async (): Promise<void> => {
       const ch = await retry(connect, {
         initialDelay: 1e3, // one second of initial delay
         maxAttempts: 30, // 30 attempts
@@ -142,10 +142,13 @@ export class ActorAwaiter<
       if (ch.signal.aborted && !reliableCh.signal.aborted) {
         const prev = this._disconnected;
         this._disconnected = Promise.withResolvers();
-        prev.resolve();
+        const reconnected = Promise.withResolvers<void>();
+        prev.resolve(reconnected.promise);
         console.error("channel closed, retrying...");
         await new Promise((resolve) => setTimeout(resolve, 2e3)); // retrying in 2 second
-        return nextConnection();
+        return nextConnection().then(reconnected.resolve).catch(
+          reconnected.reject,
+        );
       }
       ch.close();
       this.ch = null;
