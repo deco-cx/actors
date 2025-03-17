@@ -3,8 +3,10 @@
   "exports": {
     ".": "./src/actors/mod.ts",
     "./hono": "./src/actors/hono/route.ts",
-    "./proxy": "./src/actors/stub.ts",
-    "./stub": "./src/actors/stub.ts",
+    "./proxy": "./src/actors/stub/stub.ts",
+    "./stub": "./src/actors/stub/stub.ts",
+    "./stub-client": "./src/actors/stub/stub.client.ts",
+    "./stub-server": "./src/actors/stub/stub.server.ts",
     "./watch": "./src/actors/util/watch.ts",
     "./server-run": "./src/actors/server/run.ts",
     "./server-gen": "./src/actors/server/gen.ts",
@@ -31,7 +33,7 @@
   },
   "tasks": {
     "check": "deno fmt && deno lint --fix && deno check ./src/actors/mod.ts ./src/actors/hono/middleware.ts",
-    "test": "rm kv;PORT=8001 deno test -A --unstable-kv --env .",
+    "test": "rm kv;PORT=8002 deno test -A --unstable-kv --env .",
     "release": "deno run -A jsr:@deco/scripts/release"
   },
   "fmt": {

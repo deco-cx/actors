@@ -15,7 +15,7 @@ export type {
   ActorProxy as ActorStub,
   StubFactory,
   StubFactoryFn,
-} from "./stubutil.ts";
+} from "./stub/stubutil.ts";
 export { getActorLocator } from "./util/locator.ts";
 
 export { Actor, RuntimeClass } from "./discover.ts";

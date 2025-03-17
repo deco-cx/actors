@@ -1,9 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import process from "node:process";
-import type { InvokeRequest, InvokeResponse } from "./rpc.ts";
-import type { Actor, ActorConstructor } from "./runtime.ts";
-import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "./stream.ts";
-import type { ActorsOptions, ActorsServer, ActorStub } from "./stub.ts";
+import type { InvokeRequest, InvokeResponse } from "../rpc.ts";
+import type { Actor, ActorConstructor } from "../runtime.ts";
+import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "../stream.ts";
+import type { ActorStub, StubServer, StubServerOptions } from "./stub.ts";
 import {
   type Channel,
   type ChannelUpgrader,
@@ -12,21 +12,19 @@ import {
   makeChan,
   makeDuplexChannelWith,
   makeWebSocket,
-} from "./util/channels/channel.ts";
-import { readAsBytes } from "./util/channels/chunked.ts";
-import { retry } from "./util/retry.ts";
+} from "../util/channels/channel.ts";
+import { readAsBytes } from "../util/channels/chunked.ts";
+import { retry } from "../util/retry.ts";
 
-export const ACTOR_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
-export const ACTOR_ID_HEADER_NAME = "x-deno-isolate-instance-id";
-export const ACTOR_ID_QS_NAME = "deno_isolate_instance_id";
-export const ACTOR_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
+export const STUB_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
+export const STUB_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
 
-export type StubFactory<TInstance> = {
-  id: StubFactoryFn<TInstance>;
+export type StubFactory<TInstance, TArgs extends unknown[] = [string]> = {
+  new: StubFactoryFn<TInstance, TArgs>;
 };
 
-export type StubFactoryFn<TInstance> = (
-  id: string,
+export type StubFactoryFn<TInstance, TArgs extends unknown[] = [string]> = (
+  ...args: TArgs
 ) => ActorStub<TInstance>;
 /**
  * Promise.prototype.then onfufilled callback type.
@@ -38,7 +36,7 @@ export type Fulfilled<R, T> = ((result: R) => T | PromiseLike<T>) | null;
  */
 export type Rejected<E> = ((reason: any) => E | PromiseLike<E>) | null;
 
-export interface ActorInvoker<
+export interface StubInvoker<
   TResponse = any,
   TChannel extends DuplexChannel<unknown, unknown> = DuplexChannel<
     unknown,
@@ -60,7 +58,7 @@ export interface ActorInvoker<
     connect: true,
   ): Promise<TChannel>;
 }
-export class ActorAwaiter<
+export class StubAwaiter<
   TResponse,
   TChannel extends DuplexChannel<any, any>,
 > implements
@@ -76,7 +74,7 @@ export class ActorAwaiter<
     protected actorName: string,
     protected actorMethod: string,
     protected methodArgs: unknown[],
-    protected invoker: ActorInvoker<TResponse, TChannel>,
+    protected invoker: StubInvoker<TResponse, TChannel>,
     protected mMetadata?: unknown,
   ) {
     this.ctrl = new AbortController();
@@ -117,6 +115,7 @@ export class ActorAwaiter<
         this.mMetadata,
         true,
       );
+
     const sendChan = makeChan();
     const recvChan = makeChan();
     const reliableCh = makeDuplexChannelWith(sendChan, recvChan) as TChannel;
@@ -253,6 +252,8 @@ export type ActorProxy<Actor> =
     }
     : { rpc(): ActorProxy<Actor> & Disposable });
 
+export type StubProxy<TInstance> = ActorProxy<TInstance>;
+
 const urlFor = (
   serverUrl: string,
   actor: ActorConstructor | string,
@@ -265,9 +266,9 @@ const urlFor = (
 
 const IS_BROWSER = typeof document !== "undefined";
 
-let _server: ActorsServer | null = null;
+let _server: StubServer | null = null;
 const isLayeredUrl = (url: string): boolean => url.includes("layers");
-const initServer = (): ActorsServer => {
+const initServer = (): StubServer => {
   if (IS_BROWSER) {
     return {
       url: "", // relative
@@ -299,7 +300,7 @@ export const createRPCInvoker = <
   TChannel extends DuplexChannel<unknown, unknown>,
 >(
   channel: DuplexChannel<InvokeRequest, InvokeResponse>,
-): ActorInvoker<TResponse, TChannel> => {
+): StubInvoker<TResponse, TChannel> => {
   // Map to store pending requests
   const pendingRequests = new Map<
     string,
@@ -449,21 +450,26 @@ export const createRPCInvoker = <
         throw err;
       }
     },
-  } as ActorInvoker<TResponse, TChannel>;
+  } as StubInvoker<TResponse, TChannel>;
 };
+
+export interface InvokeHooks {
+  useRequest: (request: Request) => Request;
+  useWebsocketUrl: (url: URL) => URL;
+}
 
 export const createHttpInvoker = <
   TResponse,
   TChannel extends DuplexChannel<unknown, unknown>,
 >(
-  actorId: string,
-  options?: ActorsOptions,
-): ActorInvoker<TResponse, TChannel> => {
+  hooks?: InvokeHooks,
+  options?: StubServerOptions,
+): StubInvoker<TResponse, TChannel> => {
   const server = options?.server;
   if (!server) {
     _server ??= initServer();
   }
-  const actorsServer = server ?? _server!;
+  const stubServer = server ?? _server!;
   return {
     invoke: async (
       name,
@@ -472,7 +478,7 @@ export const createHttpInvoker = <
       metadata,
       connect?: true,
     ) => {
-      const endpoint = urlFor(actorsServer.url, name, method);
+      const endpoint = urlFor(stubServer.url, name, method);
       if (connect) {
         const url = new URL(`${endpoint}?args=${
           encodeURIComponent(
@@ -483,16 +489,16 @@ export const createHttpInvoker = <
               }),
             ),
           )
-        }&${ACTOR_ID_QS_NAME}=${actorId}${
+        }&${
           options?.maxWsChunkSize
-            ? `&${ACTOR_MAX_CHUNK_SIZE_QS_NAME}=${options.maxWsChunkSize}`
+            ? `&${STUB_MAX_CHUNK_SIZE_QS_NAME}=${options.maxWsChunkSize}`
             : ""
         }`);
         url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
         const newWS = options?.fetcher?.createWebSocket ??
           ((url: URL | string) => new WebSocket(url));
         const ws = newWS(
-          url,
+          hooks?.useWebsocketUrl?.(url) ?? url,
         );
         return makeWebSocket(ws, options?.maxWsChunkSize) as Promise<TChannel>;
       }
@@ -522,27 +528,25 @@ export const createHttpInvoker = <
       }
       const abortCtrl = new AbortController();
       const fetcher = options?.fetcher?.fetch ?? fetch;
-      const resp = await fetcher(
-        endpoint,
-        {
-          method: "POST",
-          signal: abortCtrl.signal,
-          credentials: actorsServer?.credentials,
-          headers: {
-            ...contentType ? { "Content-Type": contentType } : {},
-            [options?.actorIdHeaderName ?? ACTOR_ID_HEADER_NAME]: actorId,
-            ...actorsServer.deploymentId
-              ? { ["x-deno-deployment-id"]: actorsServer.deploymentId }
-              : {},
-          },
-          body,
+      const request = new Request(endpoint, {
+        method: "POST",
+        signal: abortCtrl.signal,
+        credentials: stubServer?.credentials,
+        headers: {
+          ...contentType ? { "Content-Type": contentType } : {},
+          ...stubServer.deploymentId
+            ? { ["x-deno-deployment-id"]: stubServer.deploymentId }
+            : {},
         },
-      );
+        body,
+      });
+
+      const resp = await fetcher(hooks?.useRequest?.(request) ?? request);
       if (!resp.ok) {
         if (resp.status === 404) {
           return undefined;
         }
-        const constructorName = resp.headers.get(ACTOR_CONSTRUCTOR_NAME_HEADER);
+        const constructorName = resp.headers.get(STUB_CONSTRUCTOR_NAME_HEADER);
         const ErrorConstructor =
           options?.errorHandling?.[constructorName ?? "Error"] ?? Error;
         const errorParameters =
@@ -586,27 +590,29 @@ export const createHttpInvoker = <
 };
 
 export const WELL_KNOWN_RPC_MEHTOD = "_rpc";
-export const create = <TInstance extends Actor>(
-  actor: ActorConstructor<TInstance> | string,
-  invokerFactory: (id: string) => ActorInvoker,
+
+export const create = <TInstance, TArgs extends unknown[] = unknown[]>(
+  stub: { name: string } | string,
+  stubInvokerFactory: (...args: TArgs) => StubInvoker,
   metadata?: unknown,
   disposer?: () => void,
-): StubFactory<TInstance> => {
-  const name = typeof actor === "string" ? actor : actor.name;
+): StubFactory<TInstance, TArgs> => {
+  const name = typeof stub === "string" ? stub : stub.name;
   return {
-    id: (id: string): ActorProxy<TInstance> => {
-      return new Proxy<ActorProxy<TInstance>>({} as ActorProxy<TInstance>, {
+    new: (...args: TArgs): StubProxy<TInstance> => {
+      return new Proxy<StubProxy<TInstance>>({} as StubProxy<TInstance>, {
         get: (_, method) => {
           if (method === "withMetadata") {
-            return (m: unknown) => create(actor, invokerFactory, m).id(id);
+            return (m: unknown) =>
+              create(stub, stubInvokerFactory, m).new(...args);
           }
           if (method === Symbol.dispose && disposer) {
             return disposer;
           }
-          const invoker = invokerFactory(id);
+          const invoker = stubInvokerFactory(...args);
           if (method === "rpc") {
             return () => {
-              const awaiter = new ActorAwaiter(
+              const awaiter = new StubAwaiter(
                 name,
                 WELL_KNOWN_RPC_MEHTOD,
                 [],
@@ -614,18 +620,18 @@ export const create = <TInstance extends Actor>(
                 metadata,
               );
               const rpcInvoker = createRPCInvoker(awaiter);
-              return create(
-                actor,
+              return create<TInstance, TArgs>(
+                stub,
                 () => rpcInvoker,
                 undefined,
                 () => awaiter.close(),
-              ).id(
-                id,
+              ).new(
+                ...args,
               );
             };
           }
           return (...args: unknown[]) => {
-            const awaiter = new ActorAwaiter(
+            const awaiter = new StubAwaiter(
               name,
               String(method),
               args,

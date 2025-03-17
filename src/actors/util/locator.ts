@@ -1,5 +1,5 @@
 import { ACTORS_API_SEGMENT, ACTORS_INVOKE_API_SEGMENT } from "../runtime.ts";
-import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "../stubutil.ts";
+import { ACTOR_ID_HEADER_NAME, ACTOR_ID_QS_NAME } from "../stub/stub.ts";
 
 export interface ActorLocator {
   id: string | null;
@@ -21,14 +21,14 @@ export const getActorLocator = (
     const id = req.headers.get(ACTOR_ID_HEADER_NAME) ??
       reqOrUrl.searchParams.get(ACTOR_ID_QS_NAME);
 
-    const maybeActorNameAndMethod = actorNameAndMethod(reqOrUrl.pathname);
+    const maybeActorNameAndMethod = invokeNameAndMethod(reqOrUrl.pathname);
     if (!maybeActorNameAndMethod) {
       return null;
     }
     return {
       id,
-      name: maybeActorNameAndMethod.actorName,
-      method: maybeActorNameAndMethod.methodName,
+      name: maybeActorNameAndMethod.name,
+      method: maybeActorNameAndMethod.method,
     };
   }
   return null;
@@ -37,18 +37,18 @@ export const getActorLocator = (
 /**
  * Parses Actor pathname to extract actor name and method name.
  */
-const actorNameAndMethod = (pathname: string) => {
+export const invokeNameAndMethod = (pathname: string) => {
   if (!pathname) {
     return null;
   }
   const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const [_, actorsApiSegment, actorName, invokeApiSegment, methodName] =
-    normalized.split("/");
+  const [_, actorsApiSegment, name, invokeApiSegment, method] = normalized
+    .split("/");
   if (
     actorsApiSegment !== ACTORS_API_SEGMENT ||
     invokeApiSegment !== ACTORS_INVOKE_API_SEGMENT
   ) {
     return null;
   }
-  return { actorName, methodName };
+  return { name, method };
 };

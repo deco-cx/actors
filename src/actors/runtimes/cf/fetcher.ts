@@ -3,10 +3,14 @@ import type { ActorBase } from "../../mod.ts";
 import type { ActorOptions } from "../../registry.ts";
 import { Registry } from "../../registry.ts";
 import type { ActorConstructor, ActorRuntime } from "../../runtime.ts";
-import { type ActorFetcher, actors } from "../../stub.ts";
-import { ACTOR_ID_HEADER_NAME, type StubFactory } from "../../stubutil.ts";
+import {
+  ACTOR_ID_HEADER_NAME,
+  actors,
+  type StubFetcher,
+} from "../../stub/stub.ts";
+import type { StubFactory } from "../../stub/stubutil.ts";
 import { getActorLocator } from "../../util/locator.ts";
-import { CfActor, defineWebSocketHandler } from "./actorDO.ts";
+import { CfActor } from "./actorDO.ts";
 import { WebSocketWrapper } from "./wsWrapper.ts";
 export interface Env extends Record<string, DurableObjectNamespace> {
   ACTOR_DO?: DurableObjectNamespace;
@@ -50,23 +54,6 @@ export class ActorCfRuntime<
     if (this.actorsConstructors) {
       Registry.register({}, ...this.actorsConstructors);
     }
-    defineWebSocketHandler(() => {
-      const webSocketPair = new WebSocketPair();
-      const [client, server] = Object.values(webSocketPair);
-      const originalAccept = server.accept.bind(server);
-      server.accept = () => {
-        originalAccept();
-        server.dispatchEvent(new Event("open"));
-      };
-      return {
-        socket: server,
-        response: new Response(null, {
-          status: 101,
-          // @ts-ignore: webSocket is not part of the Response type
-          webSocket: client,
-        }),
-      };
-    });
   }
 
   public stub<
@@ -106,7 +93,7 @@ export class ActorCfRuntime<
     const id = DO.idFromName(actorId);
     return DO.get(id);
   }
-  fetcher(env?: Env): ActorFetcher {
+  fetcher(env?: Env): StubFetcher {
     return {
       createWebSocket: (urlOrString: string | URL) => {
         const url = new URL(urlOrString);
