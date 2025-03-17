@@ -1,15 +1,15 @@
 import type { Actor, ActorConstructor } from "./runtime.ts";
 import type { ActorStorage } from "./storage.ts";
-import type { ActorsOptions } from "./stub.ts";
-import type { create } from "./stubutil.ts";
+import type { StubServerOptions } from "./stub/stub.ts";
+import type { create } from "./stub/stubutil.ts";
 
 export interface ActorStateOptions {
   id: string;
   storage: ActorStorage;
   stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
-    options?: ActorsOptions,
-  ) => ReturnType<typeof create<TInstance>>;
+    options?: StubServerOptions,
+  ) => ReturnType<typeof create<TInstance, [string]>>;
 }
 /**
  * Represents the state of an actor.
@@ -19,8 +19,8 @@ export class ActorState {
   public storage: ActorStorage;
   public stub: <TInstance extends Actor>(
     actor: ActorConstructor<TInstance>,
-    options?: ActorsOptions,
-  ) => ReturnType<typeof create<TInstance>>;
+    options?: StubServerOptions,
+  ) => ReturnType<typeof create<TInstance, [string]>>;
   public initialization: Promise<void> = Promise.resolve();
   constructor(options: ActorStateOptions) {
     this.storage = options.storage;

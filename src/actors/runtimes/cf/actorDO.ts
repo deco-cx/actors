@@ -11,25 +11,13 @@ import {
   ACTORS_API_SEGMENT,
   ACTORS_INVOKE_API_SEGMENT,
   StdActorRuntime,
-  type WebSocketUpgradeHandler,
 } from "../../runtime.ts";
 import {
   type ActorMetadata,
   DurableObjectActorStorage,
 } from "../../storage/cf.ts";
-import { ACTOR_ID_QS_NAME } from "../../stubutil.ts";
+import { ACTOR_ID_QS_NAME } from "../../stub/stub.ts";
 import type { Env } from "./fetcher.ts";
-
-let WEBSOCKET_HANDLER: WebSocketUpgradeHandler | undefined;
-
-/**
- * Register actors to be used by the Durable Object.
- */
-export function defineWebSocketHandler(
-  websocketHandler: WebSocketUpgradeHandler,
-) {
-  WEBSOCKET_HANDLER = websocketHandler;
-}
 
 export interface AlarmsManager {
   saveActorMetadata(options: ActorMetadata): Promise<void>;
@@ -47,9 +35,6 @@ export class ActorDurableObject {
     actors?: ActorConstructor[],
   ) {
     this.runtime = new StdActorRuntime(env, actors ?? Registry.registered());
-    if (WEBSOCKET_HANDLER) {
-      this.runtime.setWebSocketHandler(WEBSOCKET_HANDLER);
-    }
     this.alarms = {
       saveActorMetadata: async (options) => {
         await state.storage.put(ACTOR_METADATA_KEY, options);

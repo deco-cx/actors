@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { isEventStreamResponse } from "./stream.ts";
-import type { ActorInvoker } from "./stubutil.ts";
+import type { StubInvoker } from "./stub/stubutil.ts";
 import {
   type ChannelUpgrader,
   type DuplexChannel,
@@ -24,7 +24,7 @@ export interface InvokeCloseChannelRequest {
 
 export interface InvokeActorRequest {
   id: string;
-  invoke: Parameters<ActorInvoker["invoke"]>;
+  invoke: Parameters<StubInvoker["invoke"]>;
 }
 
 export interface InvokeChannelMessage {
@@ -104,7 +104,7 @@ const convertError = (error: unknown) => {
     error,
   };
 };
-export const rpc = (invoker: ActorInvoker, metadata?: unknown): ChannelUpgrader<
+export const rpc = (invoker: StubInvoker, metadata?: unknown): ChannelUpgrader<
   InvokeResponse,
   InvokeRequest
 > => {

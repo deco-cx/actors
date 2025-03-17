@@ -2,7 +2,7 @@ import { assertEquals, assertFalse } from "jsr:@std/assert@^1.0.5";
 import { Actor } from "./mod.ts";
 import { StdActorRuntime } from "./runtime.ts";
 import type { ActorState } from "./state.ts";
-import { actors } from "./stub.ts";
+import { actors } from "./stub/stub.ts";
 import type { ChannelUpgrader } from "./util/channels/channel.ts";
 import { readAsBytes } from "./util/channels/chunked.ts";
 import { WatchTarget } from "./util/watch.ts";
@@ -56,7 +56,7 @@ class Counter {
     return p.promise;
   }
   callSayHello(): Promise<string> {
-    const hello = this.state.stub(Hello).id(this.state.id);
+    const hello = this.state.stub(Hello).new(this.state.id);
     return hello.sayHello();
   }
 
@@ -83,7 +83,7 @@ class Counter {
   }
 
   async *readHelloChan(name: string): AsyncIterableIterator<string> {
-    const hello = this.state.stub(Hello).id(this.state.id);
+    const hello = this.state.stub(Hello).new(this.state.id);
     using helloChan = hello.chan(name);
     for await (const event of helloChan.recv()) {
       yield event;
@@ -107,7 +107,7 @@ const runServer = (
   onReq?: (req: Request) => void,
 ): AsyncDisposable => {
   const server = Deno.serve({
-    port: 8001,
+    port: 8002,
     handler: (req) => {
       onReq?.(req);
       return rt.fetch(req);
@@ -138,7 +138,7 @@ Deno.test("actor tests", async () => {
   const actorId = "1234";
   const counterStub = actors.stub(Counter, { maxWsChunkSize: 64 });
 
-  const counterActor = counterStub.id(actorId);
+  const counterActor = counterStub.new(actorId);
 
   const waitForAttach = counterActor.waitForAbortSignalAttach().then((p) => p);
   await nextRequest.promise;
@@ -151,9 +151,9 @@ Deno.test("actor tests", async () => {
   abort();
   assertEquals(await shouldReturnHelloOnlyWhenAborted, "HELLO ITS RESOLVED!");
 
-  using rpcActor = counterStub.id("12345").rpc();
+  using rpcActor = counterStub.new("12345").rpc();
 
-  const helloUploadActor = actors.stub(Hello).id("123456");
+  const helloUploadActor = actors.stub(Hello).new("123456");
 
   // Test file upload
   const testData = new TextEncoder().encode("Hello ");
