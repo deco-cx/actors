@@ -164,6 +164,9 @@ export const server = <T extends object>(
           status: 200,
         });
       }
+      if (res instanceof Response) {
+        return res;
+      }
       return Response.json(res);
     } catch (err) {
       if (err instanceof StubError) {
