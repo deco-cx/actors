@@ -19,10 +19,10 @@ export class DurableObjectActorStorage implements ActorStorage {
   sql?: SqlStorage;
   constructor(
     private storage: DurableObjectStorage | DurableObjectTransaction,
-    private options: ActorMetadata,
+    private options: ActorMetadata & { sql?: SqlStorage },
     private alarms?: AlarmsManager,
   ) {
-    this.sql = this.storage.sql;
+    this.sql = this.options.sql ?? this.storage?.sql;
   }
 
   async setAlarm(dt: number): Promise<void> {
@@ -196,7 +196,7 @@ export class DurableObjectActorStorage implements ActorStorage {
     await this.storage.transaction(async (txn: DurableObjectTransaction) => {
       const storage = new DurableObjectActorStorage(
         txn,
-        this.options,
+        { ...this.options, sql: this.sql },
       );
       await closure(storage);
     });
