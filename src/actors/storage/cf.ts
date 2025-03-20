@@ -1,6 +1,7 @@
 import type {
   DurableObjectStorage,
   DurableObjectTransaction,
+  SqlStorage,
 } from "@cloudflare/workers-types";
 import type { AlarmsManager } from "../runtimes/cf/actorDO.ts";
 import type {
@@ -15,11 +16,14 @@ export interface ActorMetadata {
   actorId: string;
 }
 export class DurableObjectActorStorage implements ActorStorage {
+  sql?: SqlStorage;
   constructor(
     private storage: DurableObjectStorage | DurableObjectTransaction,
     private options: ActorMetadata,
     private alarms?: AlarmsManager,
-  ) {}
+  ) {
+    this.sql = this.storage.sql;
+  }
 
   async setAlarm(dt: number): Promise<void> {
     await this.alarms?.saveActorMetadata(this.options);

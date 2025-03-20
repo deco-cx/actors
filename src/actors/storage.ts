@@ -19,6 +19,7 @@ export interface ActorStoragePutOptions {
  * Represents the storage of an actor.
  */
 export interface ActorStorage {
+  sql?: SqlStorage;
   get<T = unknown>(
     key: string,
     options?: ActorStorageGetOptions,
