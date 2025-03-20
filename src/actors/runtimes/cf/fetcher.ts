@@ -25,6 +25,57 @@ function toSnakeUpperCase(input: string) {
     .replace(/[\s-]+/g, "_") // Replace spaces and hyphens with underscores
     .toUpperCase(); // Convert to uppercase
 }
+
+const getDO = (
+  request: Request,
+  env?: Env,
+  ensurePublic: boolean = false,
+): DurableObjectStub | undefined => {
+  if (!env) {
+    return undefined;
+  }
+  const actor = getActorLocator(request);
+
+  if (!actor?.id) {
+    return undefined;
+  }
+  const actorId = actor.id;
+
+  if (ensurePublic && !Registry.isPublic(actor.name)) {
+    return undefined;
+  }
+
+  const doName = toSnakeUpperCase(actor.name);
+  const DO = doName in env ? env[doName] : env.ACTOR_DO;
+
+  const id = DO.idFromName(actorId);
+  return DO.get(id);
+}
+
+export const createFetcher = (env?: Env): StubFetcher => {
+  return {
+    createWebSocket: (urlOrString: string | URL) => {
+      const url = new URL(urlOrString);
+      const request = new Request(url);
+      const durableObject = getDO(request, env);
+      if (!durableObject) {
+        throw new Error(`Missing ${ACTOR_ID_HEADER_NAME} or env`);
+      }
+      return new WebSocketWrapper(durableObject.connect(url.toString()));
+    },
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      const durableObject = getDO(request, env);
+
+      if (!durableObject) {
+        return new Response(`Missing ${ACTOR_ID_HEADER_NAME} or env`, {
+          status: 500,
+        });
+      }
+      return await durableObject.fetch(request);
+    },
+  };
+}
 export class ActorCfRuntime<
   TEnvs extends object = object,
   TActors extends Array<ActorConstructor> = Array<ActorConstructor>,
@@ -68,57 +119,11 @@ export class ActorCfRuntime<
     );
   }
 
-  private getDO(
-    request: Request,
-    env?: Env,
-    ensurePublic: boolean = false,
-  ): DurableObjectStub | undefined {
-    if (!env) {
-      return undefined;
-    }
-    const actor = getActorLocator(request);
-
-    if (!actor?.id) {
-      return undefined;
-    }
-    const actorId = actor.id;
-
-    if (ensurePublic && !Registry.isPublic(actor.name)) {
-      return undefined;
-    }
-
-    const doName = toSnakeUpperCase(actor.name);
-    const DO = doName in env ? env[doName] : env.ACTOR_DO;
-
-    const id = DO.idFromName(actorId);
-    return DO.get(id);
-  }
   fetcher(env?: Env): StubFetcher {
-    return {
-      createWebSocket: (urlOrString: string | URL) => {
-        const url = new URL(urlOrString);
-        const request = new Request(url);
-        const durableObject = this.getDO(request, env);
-        if (!durableObject) {
-          throw new Error(`Missing ${ACTOR_ID_HEADER_NAME} or env`);
-        }
-        return new WebSocketWrapper(durableObject.connect(url.toString()));
-      },
-      fetch: async (input, init) => {
-        const request = new Request(input, init);
-        const durableObject = this.getDO(request, env);
-
-        if (!durableObject) {
-          return new Response(`Missing ${ACTOR_ID_HEADER_NAME} or env`, {
-            status: 500,
-          });
-        }
-        return await durableObject.fetch(request);
-      },
-    };
+    return createFetcher(env);
   }
   fetch(request: Request, env?: Env | undefined): Promise<Response> | Response {
-    const durableObject = this.getDO(request, env, true); // ensure public
+    const durableObject = getDO(request, env, true); // ensure public
     if (!durableObject) {
       return new Response(`Missing ${ACTOR_ID_HEADER_NAME} or Env`, {
         status: 400,

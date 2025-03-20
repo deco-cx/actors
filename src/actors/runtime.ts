@@ -3,7 +3,7 @@ import { StubError } from "./errors.ts";
 import type { ActorBase } from "./mod.ts";
 import { type ActorOptions, Registry } from "./registry.ts";
 import { ActorSilo } from "./silo.ts";
-import type { ActorState } from "./state.ts";
+import type { ActorState, ActorStateOptions } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import { DenoKvActorStorage } from "./storage/denoKv.ts";
 import { S3ActorStorage } from "./storage/s3.ts";
@@ -89,6 +89,7 @@ export class StdActorRuntime<TEnv extends object = object>
   constructor(
     protected env?: TEnv,
     _actorsConstructors?: Array<ActorConstructor>,
+    private stub?: ActorStateOptions["stub"],
   ) {
     this.actorsConstructors = _actorsConstructors ?? Registry.registered() ??
       [];
@@ -147,6 +148,7 @@ export class StdActorRuntime<TEnv extends object = object>
         actorId,
         this.getActorStorage.bind(this),
         this.env,
+        this.stub,
       );
       this.silos.set(actorId, silo);
     }
