@@ -1,7 +1,7 @@
 import { StubError } from "./errors.ts";
 import { invoke } from "./stub/invoker.ts";
 import type { ActorConstructor, StubInstance } from "./runtime.ts";
-import { ActorState } from "./state.ts";
+import { ActorState, type ActorStateOptions } from "./state.ts";
 import type { ActorStorage } from "./storage.ts";
 import { createActorHttpInvoker } from "./stub/stub.ts";
 import { create } from "./stub/stubutil.ts";
@@ -17,6 +17,7 @@ export class ActorSilo<TEnv extends object = object> {
       actorName: string,
     ) => ActorStorage,
     private env?: TEnv,
+    private stub?: ActorStateOptions["stub"],
   ) {
     this.initializeActors();
   }
@@ -30,7 +31,7 @@ export class ActorSilo<TEnv extends object = object> {
       const state = new ActorState({
         id: this.actorId,
         storage,
-        stub: (actor, options) => {
+        stub: this.stub ?? ((actor, options) => {
           const invoker = (id: string) => {
             if (id === this.actorId) {
               return {
@@ -40,7 +41,7 @@ export class ActorSilo<TEnv extends object = object> {
             return createActorHttpInvoker(id, options);
           };
           return create(actor, invoker);
-        },
+        }),
       });
       const actor = new Actor(state, this.env);
       this.actors.set(Actor.name, {

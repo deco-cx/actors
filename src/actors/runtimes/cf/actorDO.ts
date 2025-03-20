@@ -16,8 +16,8 @@ import {
   type ActorMetadata,
   DurableObjectActorStorage,
 } from "../../storage/cf.ts";
-import { ACTOR_ID_QS_NAME } from "../../stub/stub.ts";
-import type { Env } from "./fetcher.ts";
+import { ACTOR_ID_QS_NAME, actors as _actors } from "../../stub/stub.ts";
+import { createFetcher, type Env } from "./fetcher.ts";
 
 export interface AlarmsManager {
   saveActorMetadata(options: ActorMetadata): Promise<void>;
@@ -34,7 +34,15 @@ export class ActorDurableObject {
     env: Env,
     actors?: ActorConstructor[],
   ) {
-    this.runtime = new StdActorRuntime(env, actors ?? Registry.registered());
+    this.runtime = new StdActorRuntime(
+      env,
+      actors ?? Registry.registered(),
+      (c) => {
+        return _actors.stub(c, {
+          fetcher: createFetcher(env),
+        });
+      },
+    );
     this.alarms = {
       saveActorMetadata: async (options) => {
         await state.storage.put(ACTOR_METADATA_KEY, options);
