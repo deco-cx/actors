@@ -8,6 +8,10 @@ import { create } from "./stub/stubutil.ts";
 
 export class ActorSilo<TEnv extends object = object> {
   private actors: Map<string, StubInstance> = new Map<string, StubInstance>();
+  private actorConstructors: Map<string, ActorConstructor> = new Map<
+    string,
+    ActorConstructor
+  >();
 
   constructor(
     protected actorsConstructors: Array<ActorConstructor>,
@@ -19,40 +23,46 @@ export class ActorSilo<TEnv extends object = object> {
     private env?: TEnv,
     private stub?: ActorStateOptions["stub"],
   ) {
-    this.initializeActors();
-  }
-
-  private initializeActors() {
     this.actorsConstructors.forEach((Actor) => {
-      if (this.actors.has(Actor.name)) {
-        return;
-      }
-      const storage = this.getActorStorage(this.actorId, Actor.name);
-      const state = new ActorState({
-        id: this.actorId,
-        storage,
-        stub: this.stub ?? ((actor, options) => {
-          const invoker = (id: string) => {
-            if (id === this.actorId) {
-              return {
-                invoke: this.invoke.bind(this),
-              };
-            }
-            return createActorHttpInvoker(id, options);
-          };
-          return create(actor, invoker);
-        }),
-      });
-      const actor = new Actor(state, this.env);
-      this.actors.set(Actor.name, {
-        instance: actor,
-        state,
-        initialization: state.initialization,
-      });
+      this.actorConstructors.set(Actor.name, Actor);
     });
   }
+
+  private initializeActor(actorName: string) {
+    const Actor = this.actorConstructors.get(actorName);
+    if (!Actor) {
+      throw new StubError(`actor ${actorName} not found`, "NOT_FOUND");
+    }
+    const storage = this.getActorStorage(this.actorId, actorName);
+    const state = new ActorState({
+      id: this.actorId,
+      storage,
+      stub: this.stub ?? ((actor, options) => {
+        const invoker = (id: string) => {
+          if (id === this.actorId) {
+            return {
+              invoke: this.invoke.bind(this),
+            };
+          }
+          return createActorHttpInvoker(id, options);
+        };
+        return create(actor, invoker);
+      }),
+    });
+    const actor = new Actor(state, this.env);
+    this.actors.set(Actor.name, {
+      instance: actor,
+      state,
+      initialization: state.initialization,
+    });
+  }
+
   public async instance(actorName: string) {
-    const actorInstance = this.actors.get(actorName);
+    let actorInstance = this.actors.get(actorName);
+    if (!actorInstance) {
+      this.initializeActor(actorName);
+      actorInstance = this.actors.get(actorName);
+    }
     if (!actorInstance) {
       throw new StubError(`actor ${actorName} not found`, "NOT_FOUND");
     }
@@ -68,14 +78,8 @@ export class ActorSilo<TEnv extends object = object> {
     connect?: true,
     req?: Request,
   ) {
-    const actorInstance = this.actors.get(actorName);
-    if (!actorInstance) {
-      throw new StubError(`actor ${name} not found`, "NOT_FOUND");
-    }
-    await actorInstance.initialization;
-    const instance = actorInstance.instance;
     return invoke(
-      instance,
+      await this.instance(actorName),
       actorName,
       methodName,
       args,

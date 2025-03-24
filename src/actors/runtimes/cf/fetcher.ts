@@ -50,7 +50,7 @@ const getDO = (
 
   const id = DO.idFromName(actorId);
   return DO.get(id);
-}
+};
 
 export const createFetcher = (env?: Env): StubFetcher => {
   return {
@@ -75,7 +75,7 @@ export const createFetcher = (env?: Env): StubFetcher => {
       return await durableObject.fetch(request);
     },
   };
-}
+};
 export class ActorCfRuntime<
   TEnvs extends object = object,
   TActors extends Array<ActorConstructor> = Array<ActorConstructor>,
