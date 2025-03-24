@@ -119,6 +119,7 @@ export class StdActorRuntime<TEnv extends object = object>
     return new DenoKvActorStorage({
       actorId,
       actorName,
+      runtime: this,
     });
   }
   private instanceFactory(name: string, req: Request): Promise<Actor> {

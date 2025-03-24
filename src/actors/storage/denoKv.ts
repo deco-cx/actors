@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import { join } from "node:path";
 import process from "node:process";
 import type {
@@ -5,11 +6,18 @@ import type {
   ActorStorageListOptions,
   ActorStoragePutOptions,
 } from "../storage.ts";
+import {
+  type ActorRuntime,
+  ACTORS_API_SEGMENT,
+  ACTORS_INVOKE_API_SEGMENT,
+} from "../runtime.ts";
+import { ACTOR_ID_QS_NAME } from "../stub/stub.ts";
 
 export interface StorageOptions {
   actorName: string;
   actorId: string;
   atomicOp?: AtomicOp;
+  runtime?: ActorRuntime<any>;
 }
 
 const ACTORS_KV_DATABASE = process?.env?.ACTORS_KV_DATABASE ??
@@ -44,6 +52,8 @@ export class DenoKvActorStorage implements ActorStorage {
   private kv: Deno.Kv;
   private atomicOp?: AtomicOp;
   private kvOrTransaction: Deno.Kv | Deno.AtomicOperation;
+  private alarmTimeout?: number;
+  private alarmTime: number | null = null;
 
   constructor(protected options: StorageOptions) {
     assertIsDefined(kv);
@@ -51,14 +61,63 @@ export class DenoKvActorStorage implements ActorStorage {
     this.kvOrTransaction = options.atomicOp?.kv ?? kv;
     this.atomicOp = options.atomicOp;
   }
-  setAlarm(_dt: number): Promise<void> {
-    throw new Error("Method not implemented.");
+  private warnAlams() {
+    console.warn(
+      "Alarms is in testing mode, it will work until the process is killed",
+    );
+  }
+
+  private async triggerAlarm() {
+    if (!this.options.runtime) {
+      throw new Error("Runtime is not set");
+    }
+    const { actorId, actorName } = this.options;
+    const url = new URL(
+      `/${ACTORS_API_SEGMENT}/${actorName}/${ACTORS_INVOKE_API_SEGMENT}/alarm?${ACTOR_ID_QS_NAME}=${actorId}`,
+      "http://localhost",
+    );
+    const response = await this.options.runtime.fetch(
+      new Request(url, { method: "POST" }),
+    );
+    if (!response.ok) {
+      throw new Error(
+        `alarm error: ${await response.text()} ${response.status}`,
+      );
+    }
+  }
+  setAlarm(dt: number): Promise<void> {
+    this.warnAlams();
+    // Clear any existing alarm
+    if (this.alarmTimeout) {
+      clearTimeout(this.alarmTimeout);
+    }
+
+    this.alarmTime = dt;
+    const delay = dt - Date.now();
+
+    if (delay > 0) {
+      this.alarmTimeout = setTimeout(async () => {
+        this.alarmTime = null;
+        await this.triggerAlarm().catch((e) => {
+          console.error("alarm error", e);
+        });
+      }, delay);
+    }
+
+    return Promise.resolve();
   }
   getAlarm(): Promise<number | null> {
-    throw new Error("Method not implemented.");
+    this.warnAlams();
+    return Promise.resolve(this.alarmTime);
   }
   deleteAlarm(): Promise<void> {
-    throw new Error("Method not implemented.");
+    this.warnAlams();
+    if (this.alarmTimeout) {
+      clearTimeout(this.alarmTimeout);
+      this.alarmTimeout = undefined;
+    }
+    this.alarmTime = null;
+    return Promise.resolve();
   }
 
   async atomic(_storage: (st: ActorStorage) => Promise<void>): Promise<void> {
