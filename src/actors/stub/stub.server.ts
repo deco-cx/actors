@@ -74,10 +74,17 @@ export const server = <T extends object>(
     }
     let args = [], metadata = {};
     if (req.headers.get("content-type")?.includes("application/json")) {
-      const { args: margs, metadata: maybeMetadata } = (await req
+      const payload = (await req
         .json()) as any;
-      args = margs;
-      metadata = maybeMetadata;
+
+      if (typeof payload === "object" && "args" in payload) {
+        const { args: margs, metadata: maybeMetadata } = payload;
+        args = margs;
+        metadata = maybeMetadata;
+      } else {
+        args = payload;
+        metadata = {};
+      }
     } else if (isFormData(req)) {
       const formData = await req.formData();
       const file = formData.get("file") as File;
