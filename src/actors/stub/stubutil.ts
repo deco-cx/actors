@@ -231,7 +231,9 @@ export interface BaseMetadata {
  */
 export type ActorProxy<Actor> =
   & {
-    [key in keyof Omit<Actor, "enrichMetadata" | "metadata">]: PromisifyKey<
+    [
+      key in keyof Omit<Actor, "enrichMetadata" | "metadata" | "onBeforeInvoke">
+    ]: PromisifyKey<
       Actor,
       key
     >;

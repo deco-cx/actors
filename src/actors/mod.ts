@@ -19,3 +19,7 @@ export type {
 export { getActorLocator } from "./util/locator.ts";
 
 export { Actor, RuntimeClass } from "./discover.ts";
+export type {
+  InvokeMiddleware,
+  InvokeMiddlewareOptions,
+} from "./stub/stub.server.ts";

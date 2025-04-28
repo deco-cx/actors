@@ -26,17 +26,21 @@ const isWellKnownEnrichMetadataMethod = (methodName: string) =>
 const isWellKnownRPCMethod = (methodName: string) =>
   methodName === WELL_KNOWN_RPC_MEHTOD;
 
+export interface InvokeOptions<TInstance extends object> {
+  instance: TInstance;
+  stubName: string;
+  methodName: string;
+  args: unknown[];
+  metadata: unknown;
+  connect?: true;
+  request?: Request;
+}
 /**
  * Invoke a method on a stub instance.
  */
 export const invoke = async <TInstance extends object>(
-  instance: TInstance,
-  stubName: string,
-  methodName: string,
-  args: unknown[],
-  metadata: unknown,
-  connect?: true,
-  req?: Request,
+  { request: req, connect, instance, stubName, methodName, args, metadata }:
+    InvokeOptions<TInstance>,
 ) => {
   const method = KNOWN_METHODS[methodName] ?? methodName;
   metadata = WELL_KNOWN_ENRICH_METADATA_METHOD in instance && req
@@ -50,7 +54,15 @@ export const invoke = async <TInstance extends object>(
     const chan = rpc({
       // @ts-ignore: this is a hack to make the invoke method work
       invoke: (name, method, args, metadata, connect) =>
-        invoke(instance, name, method, args, metadata, connect),
+        invoke({
+          instance,
+          stubName: name,
+          methodName: method,
+          args,
+          metadata,
+          connect,
+          request: req,
+        }),
     }, metadata);
     return chan;
   }
