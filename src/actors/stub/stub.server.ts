@@ -45,6 +45,7 @@ const upgradeWebSocket = (req: Request) => {
 };
 
 export interface InvokeMiddlewareOptions {
+  method: string;
   args: unknown[];
   metadata: unknown;
   request: Request;
@@ -223,13 +224,13 @@ export const server = <T extends object>(
       return invokeResponse(url, {
         instance: objInstance,
         stubName,
-        methodName: stubMethod,
+        methodName: mid.method,
         args: mid.args,
         metadata: mid.metadata,
         request: mid.request,
       });
     };
-    const options = { args, metadata, request: req };
+    const options = { args, metadata, request: req, method: stubMethod };
     if (hasInvokeMiddleware(objInstance)) {
       return objInstance.onBeforeInvoke(options, next);
     }
