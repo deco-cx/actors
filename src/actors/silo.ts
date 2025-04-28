@@ -78,14 +78,14 @@ export class ActorSilo<TEnv extends object = object> {
     connect?: true,
     req?: Request,
   ) {
-    return invoke(
-      await this.instance(actorName),
-      actorName,
+    return invoke({
+      instance: await this.instance(actorName),
+      stubName: actorName,
       methodName,
       args,
       metadata,
       connect,
-      req,
-    );
+      request: req,
+    });
   }
 }
