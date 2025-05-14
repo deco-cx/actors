@@ -14,6 +14,7 @@ import {
 } from "../util/sse.ts";
 import { invoke, type InvokeOptions } from "./invoker.ts";
 import {
+  SHOULD_PARSE_RESPONSE_HEADER,
   STUB_CONSTRUCTOR_NAME_HEADER,
   STUB_MAX_CHUNK_SIZE_QS_NAME,
 } from "./stubutil.ts";
@@ -133,7 +134,12 @@ const invokeResponse = async (
       });
     }
     if (res instanceof Response) {
-      return res;
+      const headersCopy = new Headers(res.headers);
+      headersCopy.set(SHOULD_PARSE_RESPONSE_HEADER, "false");
+      return new Response(res.body, {
+        headers: headersCopy,
+        status: res.status,
+      });
     }
     return Response.json(res);
   } catch (err) {

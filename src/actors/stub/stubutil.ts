@@ -18,6 +18,7 @@ import type { ActorStub, StubServer, StubServerOptions } from "./stub.ts";
 
 export const STUB_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
 export const STUB_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
+export const SHOULD_PARSE_RESPONSE_HEADER = "x-actors-should-parse-response";
 
 export type StubFactory<TInstance, TArgs extends unknown[] = [string]> = {
   new: StubFactoryFn<TInstance, TArgs>;
@@ -580,14 +581,14 @@ export const createHttpInvoker = <
       if (resp.status === 204) {
         return;
       }
+      if (resp.headers.get(SHOULD_PARSE_RESPONSE_HEADER) === "false") {
+        return resp;
+      }
       if (
         resp.headers.get("content-type")?.includes("application/octet-stream")
       ) {
         // @ts-ignore: cf types mess with typings.
         return new Uint8Array(await resp.arrayBuffer());
-      }
-      if (resp.headers.get("x-vercel-ai-data-stream")?.includes("v1")) {
-        return resp;
       }
       if (resp.headers.get("content-type")?.includes("text/plain")) {
         return resp.text();
