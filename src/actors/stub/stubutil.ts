@@ -3,7 +3,6 @@ import process from "node:process";
 import type { InvokeRequest, InvokeResponse } from "../rpc.ts";
 import type { Actor, ActorConstructor } from "../runtime.ts";
 import { EVENT_STREAM_RESPONSE_HEADER, readFromStream } from "../stream.ts";
-import type { ActorStub, StubServer, StubServerOptions } from "./stub.ts";
 import {
   type Channel,
   type ChannelUpgrader,
@@ -15,6 +14,7 @@ import {
 } from "../util/channels/channel.ts";
 import { readAsBytes } from "../util/channels/chunked.ts";
 import { retry } from "../util/retry.ts";
+import type { ActorStub, StubServer, StubServerOptions } from "./stub.ts";
 
 export const STUB_MAX_CHUNK_SIZE_QS_NAME = "max_chunk_size";
 export const STUB_CONSTRUCTOR_NAME_HEADER = "x-error-constructor-name";
@@ -585,6 +585,12 @@ export const createHttpInvoker = <
       ) {
         // @ts-ignore: cf types mess with typings.
         return new Uint8Array(await resp.arrayBuffer());
+      }
+      if (resp.headers.get("x-vercel-ai-data-stream")?.includes("v1")) {
+        return resp;
+      }
+      if (resp.headers.get("content-type")?.includes("text/plain")) {
+        return resp.text();
       }
       return resp.json() as Promise<any>;
     },
