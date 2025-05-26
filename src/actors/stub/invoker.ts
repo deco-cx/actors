@@ -35,6 +35,7 @@ export interface InvokeOptions<TInstance extends object> {
   connect?: true;
   request?: Request;
 }
+const PRIVATE_METHOD_PREFIX = "_";
 /**
  * Invoke a method on a stub instance.
  */
@@ -42,6 +43,12 @@ export const invoke = async <TInstance extends object>(
   { request: req, connect, instance, stubName, methodName, args, metadata }:
     InvokeOptions<TInstance>,
 ) => {
+  if (methodName.startsWith(PRIVATE_METHOD_PREFIX)) {
+    throw new StubError(
+      `method ${methodName} not found on actor ${stubName}`,
+      "METHOD_NOT_FOUND",
+    );
+  }
   const method = KNOWN_METHODS[methodName] ?? methodName;
   metadata = WELL_KNOWN_ENRICH_METADATA_METHOD in instance && req
     ? await (instance.enrichMetadata as EnrichMetadataFn<unknown>)(
