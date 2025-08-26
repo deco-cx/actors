@@ -6,7 +6,6 @@ import {
   type ActorRuntime,
   StdActorRuntime,
 } from "./runtime.ts";
-import { ActorCfRuntime } from "./runtimes/cf/fetcher.ts";
 
 const IS_DENO = getRuntimeKey() === "deno";
 
@@ -20,7 +19,7 @@ export const RuntimeClass: {
   >(
     Actor: TConstructor,
   ) => TConstructor;
-} = IS_DENO ? StdActorRuntime : ActorCfRuntime;
+} = IS_DENO ? StdActorRuntime : StdActorRuntime;
 
 export const RUNTIME = new RuntimeClass();
 export const Actor = RuntimeClass.Actor;

@@ -40,7 +40,7 @@ function assertIsDefined<V>(
 ): asserts v is NonNullable<V> {
   const isDefined = v !== null && typeof v !== "undefined";
   if (!isDefined) {
-    throw new Error(`Expected 'v' to be defined, but received ${v}`);
+    throw new Error(`Expected 'DenoKv' to be defined, but received ${v}`);
   }
 }
 interface AtomicOp {
@@ -58,7 +58,7 @@ export class DenoKvActorStorage implements ActorStorage {
   constructor(protected options: StorageOptions) {
     assertIsDefined(kv);
     this.kv = kv;
-    this.kvOrTransaction = options.atomicOp?.kv ?? kv;
+    this.kvOrTransaction = options.atomicOp?.kv ?? this.kv;
     this.atomicOp = options.atomicOp;
   }
   private warnAlams() {
