@@ -5,6 +5,7 @@ import {
   EVENT_STREAM_RESPONSE_HEADER,
   isEventStreamResponse,
 } from "../stream.ts";
+import { createServerTimings, type ServerTimingsBuilder } from "../timings.ts";
 import { serializeUint8Array } from "../util/buffers.ts";
 import { isUpgrade, makeWebSocket } from "../util/channels/channel.ts";
 import { invokeNameAndMethod } from "../util/locator.ts";
@@ -50,6 +51,7 @@ export interface InvokeMiddlewareOptions {
   args: unknown[];
   metadata: unknown;
   request: Request;
+  timings: ServerTimingsBuilder;
 }
 
 export type InvokeMiddleware = (
@@ -67,11 +69,16 @@ const hasInvokeMiddleware = (
 
 const invokeResponse = async (
   url: URL,
-  options: InvokeOptions<any> & { request: Request },
+  options: InvokeOptions<any> & {
+    request: Request;
+    timings: ServerTimingsBuilder;
+  },
 ): Promise<Response> => {
   try {
     const { request: req } = options;
+    const invokeTiming = options.timings.start("invoke");
     const res = await invoke(options);
+    invokeTiming.end();
     if (isUpgrade(res) && req.headers.get("upgrade") === "websocket") {
       const { socket, response } = upgradeWebSocket(req);
       const chunkSize = url.searchParams.get(STUB_MAX_CHUNK_SIZE_QS_NAME);
@@ -179,6 +186,8 @@ export const server = <T extends object>(
   instanceCreator: (name: string, req: Request) => Promise<T>,
 ): (req: Request) => Promise<Response> => {
   return async (req: Request) => {
+    const timings = createServerTimings();
+    using _ = timings.start("actor-entire-request");
     const url = new URL(req.url);
     const locator = invokeNameAndMethod(url.pathname);
 
@@ -186,11 +195,12 @@ export const server = <T extends object>(
       return new Response(null, { status: 404 });
     }
 
+    const instanceCreatorTiming = timings.start("actor-instance-creator");
     const objInstance = await instanceCreator(
       locator.name,
       req,
     );
-
+    instanceCreatorTiming.end();
     const { name: stubName, method: stubMethod } = locator;
     if (!stubMethod || !stubName) {
       return new Response(
@@ -227,6 +237,7 @@ export const server = <T extends object>(
       metadata = parsedArgs.metadata;
     }
     const next = (mid: InvokeMiddlewareOptions) => {
+      const invokeResponseTiming = mid.timings.start("invoke-response");
       return invokeResponse(url, {
         instance: objInstance,
         stubName,
@@ -234,11 +245,28 @@ export const server = <T extends object>(
         args: mid.args,
         metadata: mid.metadata,
         request: mid.request,
+        timings: mid.timings,
+      }).finally(() => invokeResponseTiming.end()).then((res) => {
+        try {
+          res.headers.set("server-timing", mid.timings.printTimings());
+        } catch {
+          // some headers are immutable
+        }
+        return res;
       });
     };
-    const options = { args, metadata, request: req, method: stubMethod };
+    const options = {
+      args,
+      metadata,
+      request: req,
+      method: stubMethod,
+      timings,
+    };
     if (hasInvokeMiddleware(objInstance)) {
-      return objInstance.onBeforeInvoke(options, next);
+      const onBeforeInvokeTiming = timings.start("on-before-invoke");
+      return objInstance.onBeforeInvoke(options, next).finally(() =>
+        onBeforeInvokeTiming.end()
+      );
     }
     return next(options);
   };
