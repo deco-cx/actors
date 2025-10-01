@@ -258,15 +258,17 @@ export class S3ActorStorage implements ActorStorage {
       await response.body?.cancel();
       throw new Error(`Failed to list objects: ${response.statusText}`);
     }
-    const text = await response.text();
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(text, "application/xml");
-    const keys = Array.from(xmlDoc.getElementsByTagName("Contents"))
-      .map((content) => {
-        const keyNode = content.getElementsByTagName("Key")[0];
-        return { Key: keyNode.textContent! };
-      });
-    return keys;
+    const _text = await response.text();
+
+    throw new Error("not implemented for now");
+    // const parser = new DOMParser();
+    // const xmlDoc = parser.parseFromString(text, "application/xml");
+    // const keys = Array.from(xmlDoc.getElementsByTagName("Contents"))
+    //   .map((content) => {
+    //     const keyNode = content.getElementsByTagName("Key")[0];
+    //     return { Key: keyNode.textContent! };
+    //   });
+    // return keys;
   }
 
   // Helper method to generate signed headers for S3 requests
