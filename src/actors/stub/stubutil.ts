@@ -566,6 +566,10 @@ export const createHttpInvoker = <
         );
         throw deserializedError;
       }
+      if (resp.headers.get(SHOULD_PARSE_RESPONSE_HEADER) === "false") {
+        return resp;
+      }
+
       if (
         resp.headers.get("content-type") ===
           EVENT_STREAM_RESPONSE_HEADER
@@ -581,9 +585,7 @@ export const createHttpInvoker = <
       if (resp.status === 204) {
         return;
       }
-      if (resp.headers.get(SHOULD_PARSE_RESPONSE_HEADER) === "false") {
-        return resp;
-      }
+
       if (
         resp.headers.get("content-type")?.includes("application/octet-stream")
       ) {
