@@ -12,7 +12,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
     "typescript": "^5.5.2",
-    "wrangler": "^3.91.0"
+    "wrangler": "^4.157.0"
   },
   "dependencies": {
     "@deco/actors": "npm:@jsr/deco__actors@^0.25.0-beta.8",
